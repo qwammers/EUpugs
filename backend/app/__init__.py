@@ -1,0 +1,2 @@
+"""HostedPugs backend package."""
+
