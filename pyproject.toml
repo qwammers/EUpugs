@@ -13,6 +13,7 @@ dependencies = [
   "discord.py>=2.5.2",
   "fastapi>=0.116.0",
   "httpx>=0.28.1",
+  "itsdangerous>=2.2.0",
   "pydantic-settings>=2.10.1",
   "python-multipart>=0.0.20",
   "sqlalchemy>=2.0.42",
@@ -39,4 +40,3 @@ testpaths = ["backend/tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-
