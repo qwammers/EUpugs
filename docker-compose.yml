@@ -17,6 +17,16 @@ services:
       - "*"
     env_file: .env
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   bot:
     build:
@@ -26,7 +36,8 @@ services:
     env_file: .env
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
@@ -41,7 +52,8 @@ services:
       - caddy_config:/config
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   caddy_data:

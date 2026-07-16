@@ -8,7 +8,7 @@ from discord import app_commands
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.db.session import SessionLocal, init_db
+from app.db.session import SessionLocal
 from app.models.entities import Match, Player
 from app.services.match import MatchService
 from app.services.queue import QueueService
@@ -222,10 +222,8 @@ bot.tree.add_command(admin_group, guild=discord.Object(id=int(settings.discord_g
 
 
 def run() -> None:
-    init_db()
     bot.run(settings.discord_bot_token)
 
 
 if __name__ == "__main__":
     run()
-
