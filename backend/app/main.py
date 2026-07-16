@@ -14,7 +14,9 @@ app = FastAPI(title="HostedPugs API", version="0.1.0")
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.session_secret,
-    same_site="lax",
+    # GitHub Pages and the API are different sites in production, so authenticated
+    # fetch requests require a Secure, SameSite=None session cookie.
+    same_site="none" if settings.frontend_origin.startswith("https://") else "lax",
     https_only=settings.frontend_origin.startswith("https://"),
 )
 app.add_middleware(
@@ -36,4 +38,3 @@ app.include_router(auth.router)
 app.include_router(public.router)
 app.include_router(queue.router)
 app.include_router(admin.router)
-

@@ -7,9 +7,9 @@ __pycache__/
 backend/.coverage
 backend/htmlcov/
 backend/.env
+deploy/.env.ec2
 frontend/node_modules/
 frontend/dist/
 frontend/.env
 *.sqlite3
 *.db
-
