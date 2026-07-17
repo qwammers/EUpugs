@@ -14,6 +14,7 @@ from app.schemas.player import MeResponse, PlayerAggregateRead, PlayerRead
 from app.services.auth import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+api_router = APIRouter(prefix="/api", tags=["auth"])
 
 
 @router.get("/discord/start")
@@ -69,7 +70,7 @@ def logout(
 
 
 @router.get("/me", response_model=MeResponse)
-@router.get("/api/me", response_model=MeResponse, include_in_schema=False)
+@api_router.get("/me", response_model=MeResponse)
 def get_me(
     player=Depends(get_current_player),
     settings: Settings = Depends(get_settings_dep),
