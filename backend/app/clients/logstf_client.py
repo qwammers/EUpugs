@@ -7,7 +7,12 @@ import httpx
 
 class LogsTfClient:
     base_api = "https://logs.tf/api/v1"
-    log_url_pattern = re.compile(r"logs\.tf/(?:json/)?(?P<log_id>\d+)")
+    # Historical posts commonly contain the loogs.tf typo; only the numeric ID
+    # matters because payloads are always fetched from the canonical API.
+    log_url_pattern = re.compile(
+        r"(?:https?://)?(?:www\.)?lo+gs\.tf/(?:json/)?(?P<log_id>\d+)",
+        re.IGNORECASE,
+    )
 
     async def get_log(self, log_id: int) -> dict:
         async with httpx.AsyncClient(timeout=20) as client:

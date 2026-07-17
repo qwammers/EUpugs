@@ -14,7 +14,7 @@ from app.services.stats import StatsService
 class FakeLogsClient:
     async def get_log(self, log_id: int) -> dict:
         return {
-            "info": {"logid": log_id, "title": "Test PUG", "map": "cp_process_f12"},
+            "info": {"title": "Test PUG", "map": "cp_process_f12"},
             "names": {"[U:1:12345]": "Imported Player"},
             "teams": {"Red": {"score": 5}, "Blue": {"score": 2}},
             "players": {

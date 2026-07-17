@@ -45,7 +45,7 @@ class StatsService:
         )
         self.db.add(match_log)
         self.db.flush()
-        self._ingest_log_payload(payload, match.id)
+        self._ingest_log_payload(payload, match.id, log_id=log_id)
         self.db.commit()
         self.db.refresh(match_log)
         return match_log
@@ -66,7 +66,12 @@ class StatsService:
             if exists:
                 continue
             payload = await self.client.get_log(log_id)
-            self._ingest_log_payload(payload, None, player_filter={player.steam_id})
+            self._ingest_log_payload(
+                payload,
+                None,
+                player_filter={player.steam_id},
+                log_id=log_id,
+            )
             imported += 1
         self.db.commit()
         return imported
@@ -88,7 +93,12 @@ class StatsService:
                 raw_payload=payload,
             )
         )
-        self._ingest_log_payload(payload, None, create_missing_players=True)
+        self._ingest_log_payload(
+            payload,
+            None,
+            create_missing_players=True,
+            log_id=log_id,
+        )
         self.db.commit()
         return True
 
@@ -107,8 +117,12 @@ class StatsService:
         match_id: int | None,
         player_filter: set[str] | None = None,
         create_missing_players: bool = False,
+        log_id: int | None = None,
     ) -> None:
-        log_id = int(payload["info"]["logid"])
+        payload_log_id = payload.get("info", {}).get("logid")
+        if log_id is None and payload_log_id is None:
+            raise ValueError("The logs.tf payload did not include a log ID.")
+        log_id = int(log_id if log_id is not None else payload_log_id)
         players_blob = payload.get("players", {})
         teams = payload.get("teams", {})
         winning_team = None
