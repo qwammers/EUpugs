@@ -26,13 +26,23 @@ class AuthService:
 
         steam_connection = next((item for item in connections if item.get("type") == "steam"), None)
 
-        player = self.db.scalar(select(Player).where(Player.discord_user_id == str(user["id"])))
+        discord_user_id = str(user["id"])
+        steam_id = steam_connection.get("id") if steam_connection else None
+        player = self.db.scalar(select(Player).where(Player.discord_user_id == discord_user_id))
+        provisional = None
+        if steam_id:
+            provisional = self.db.scalar(select(Player).where(Player.steam_id == steam_id))
+        if not player and provisional and provisional.discord_user_id.startswith("logstf:"):
+            player = provisional
+            player.discord_user_id = discord_user_id
         if not player:
             player = Player(
-                discord_user_id=str(user["id"]),
+                discord_user_id=discord_user_id,
                 discord_username=user["username"],
             )
             self.db.add(player)
+        elif provisional and provisional.id != player.id:
+            raise ValueError("This Steam account is already linked to another Discord account.")
 
         avatar = user.get("avatar")
         player.discord_username = user["username"]
@@ -42,7 +52,7 @@ class AuthService:
         )
         player.guild_role_ids = member.get("roles", [])
         player.steam_connected = steam_connection is not None
-        player.steam_id = steam_connection.get("id") if steam_connection else None
+        player.steam_id = steam_id
         player.steam_name = steam_connection.get("name") if steam_connection else None
         player.last_synced_at = datetime.now(timezone.utc)
 
@@ -77,4 +87,3 @@ class AuthService:
         if session:
             self.db.delete(session)
             self.db.commit()
-

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import desc, select
@@ -7,7 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.clients.logstf_client import LogsTfClient
 from app.core.config import Settings
-from app.models.entities import JobRun, Match, MatchLog, Player, PlayerAggregate, PlayerMatchStat
+from app.models.entities import (
+    ImportedLog,
+    JobRun,
+    Match,
+    MatchLog,
+    Player,
+    PlayerAggregate,
+    PlayerMatchStat,
+)
 
 
 class StatsService:
@@ -62,6 +71,27 @@ class StatsService:
         self.db.commit()
         return imported
 
+    async def import_historical_log(self, log_id: int, source: str = "bulk_import") -> bool:
+        existing = self.db.scalar(select(ImportedLog).where(ImportedLog.log_id == log_id))
+        if existing:
+            return False
+
+        payload = await self.client.get_log(log_id)
+        info = payload.get("info", {})
+        self.db.add(
+            ImportedLog(
+                log_id=log_id,
+                log_url=f"https://logs.tf/{log_id}",
+                title=info.get("title"),
+                map_name=info.get("map"),
+                source=source,
+                raw_payload=payload,
+            )
+        )
+        self._ingest_log_payload(payload, None, create_missing_players=True)
+        self.db.commit()
+        return True
+
     def get_leaderboard(self, limit: int = 25) -> list[tuple[Player, PlayerAggregate]]:
         rows = self.db.execute(
             select(Player, PlayerAggregate)
@@ -76,6 +106,7 @@ class StatsService:
         payload: dict,
         match_id: int | None,
         player_filter: set[str] | None = None,
+        create_missing_players: bool = False,
     ) -> None:
         log_id = int(payload["info"]["logid"])
         players_blob = payload.get("players", {})
@@ -86,10 +117,25 @@ class StatsService:
         elif teams.get("Blue", {}).get("score", 0) > teams.get("Red", {}).get("score", 0):
             winning_team = "Blue"
 
-        for steam_id, stats in players_blob.items():
-            if player_filter and steam_id not in player_filter:
+        canonical_filter = {self._steam64(value) for value in player_filter} if player_filter else None
+        for raw_steam_id, stats in players_blob.items():
+            steam_id = self._steam64(raw_steam_id)
+            if canonical_filter and steam_id not in canonical_filter:
                 continue
             player = self.db.scalar(select(Player).where(Player.steam_id == steam_id))
+            if not player and create_missing_players:
+                steam_name = payload.get("names", {}).get(raw_steam_id) or steam_id
+                player = Player(
+                    discord_user_id=f"logstf:{steam_id}",
+                    discord_username=steam_name,
+                    display_name=steam_name,
+                    steam_id=steam_id,
+                    steam_name=steam_name,
+                    steam_connected=False,
+                    guild_role_ids=[],
+                )
+                self.db.add(player)
+                self.db.flush()
             if not player:
                 continue
             existing = self.db.scalar(
@@ -136,10 +182,29 @@ class StatsService:
             )
         )
 
+    @staticmethod
+    def _steam64(value: str) -> str:
+        steam3 = re.fullmatch(r"\[U:1:(\d+)\]", value)
+        if steam3:
+            return str(76561197960265728 + int(steam3.group(1)))
+        steam2 = re.fullmatch(r"STEAM_[0-5]:([01]):(\d+)", value)
+        if steam2:
+            return str(76561197960265728 + int(steam2.group(2)) * 2 + int(steam2.group(1)))
+        return value
+
     def _update_aggregate(self, player_id: int, stat: PlayerMatchStat) -> None:
         aggregate = self.db.scalar(select(PlayerAggregate).where(PlayerAggregate.player_id == player_id))
         if not aggregate:
-            aggregate = PlayerAggregate(player_id=player_id)
+            aggregate = PlayerAggregate(
+                player_id=player_id,
+                matches_played=0,
+                wins=0,
+                kills=0,
+                deaths=0,
+                assists=0,
+                damage=0,
+                healing=0,
+            )
             self.db.add(aggregate)
         aggregate.matches_played += 1
         aggregate.wins += 1 if stat.won else 0
@@ -149,4 +214,3 @@ class StatsService:
         aggregate.damage += stat.damage
         aggregate.healing += stat.healing
         aggregate.last_log_id = stat.log_id
-

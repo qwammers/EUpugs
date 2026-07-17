@@ -126,6 +126,19 @@ class MatchLog(Base):
     match: Mapped[Match] = relationship(back_populates="logs")
 
 
+class ImportedLog(Base):
+    __tablename__ = "imported_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    log_id: Mapped[int] = mapped_column(unique=True)
+    log_url: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str] = mapped_column(String(255), default="bulk_import")
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class PlayerMatchStat(Base):
     __tablename__ = "player_match_stats"
 
@@ -172,4 +185,3 @@ class JobRun(Base):
     status: Mapped[str] = mapped_column(String(32), default=JobStatus.RUNNING.value)
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-

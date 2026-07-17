@@ -32,3 +32,8 @@ class LogsTfClient:
             return int(match.group("log_id"))
         return None
 
+    def parse_log_ids(self, value: str) -> set[int]:
+        ids = {int(match.group("log_id")) for match in self.log_url_pattern.finditer(value)}
+        if value.strip().isdigit():
+            ids.add(int(value.strip()))
+        return ids
