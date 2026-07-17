@@ -33,7 +33,15 @@ class FakeLogsClient:
                             "assists": 5,
                             "dmg": 6000,
                             "total_time": 1200,
-                        }
+                        },
+                        {
+                            "type": "medic",
+                            "kills": 1,
+                            "deaths": 2,
+                            "assists": 3,
+                            "dmg": 100,
+                            "total_time": 600,
+                        },
                     ],
                 }
             },
@@ -73,6 +81,21 @@ async def test_historical_import_creates_provisional_player_and_is_idempotent() 
         assert aggregate.combat_damage == 6000
         assert aggregate.combat_time_seconds == 1200
         assert db.scalar(select(ImportedLog).where(ImportedLog.log_id == 123)) is not None
+
+        class_stats = {row["class_name"]: row for row in service.get_player_class_stats(player.id)}
+        assert class_stats["scout"]["wins"] == 1
+        assert class_stats["medic"]["wins"] == 0
+        assert class_stats["scout"]["damage_per_minute"] == 300
+        assert class_stats["medic"]["damage_per_minute"] == 10
+
+        aggregate.combat_damage = 0
+        aggregate.combat_time_seconds = 0
+        db.commit()
+        assert service.rebuild_aggregates() == 1
+        rebuilt = db.scalar(select(PlayerAggregate))
+        assert rebuilt is not None
+        assert rebuilt.combat_damage == 6000
+        assert rebuilt.combat_time_seconds == 1200
 
 
 def test_most_common_observed_name_changes_only_until_admin_lock() -> None:

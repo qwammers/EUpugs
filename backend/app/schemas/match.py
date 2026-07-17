@@ -51,7 +51,6 @@ class LeaderboardEntry(BaseModel):
     steam_name: str | None
     matches_played: int
     wins: int
-    draws: int
     losses: int
     win_percentage: float
     average_kills: float

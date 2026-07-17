@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.models.entities import Player
 from app.schemas.common import HealthResponse
 from app.schemas.match import LeaderboardEntry, MatchRead, RecentMatchListResponse
-from app.schemas.player import PlayerAggregateRead, PlayerRead
+from app.schemas.player import PlayerAggregateRead, PlayerClassStatsRead, PlayerRead
 from app.schemas.queue import QueueStateResponse
 from app.services.match import MatchService
 from app.services.queue import QueueService
@@ -44,7 +44,11 @@ def get_recent_matches(db: Session = Depends(get_db)) -> RecentMatchListResponse
 
 
 @router.get("/api/players/{player_id}", response_model=PlayerRead)
-def get_player(player_id: int, db: Session = Depends(get_db)) -> PlayerRead:
+def get_player(
+    player_id: int,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings_dep),
+) -> PlayerRead:
     player = db.scalar(
         select(Player).where(Player.id == player_id).options(joinedload(Player.aggregate))
     )
@@ -55,6 +59,10 @@ def get_player(player_id: int, db: Session = Depends(get_db)) -> PlayerRead:
         if player.aggregate
         else None
     )
+    class_stats = [
+        PlayerClassStatsRead(**row)
+        for row in StatsService(db, settings).get_player_class_stats(player.id)
+    ]
     return PlayerRead(
         id=player.id,
         discord_user_id=player.discord_user_id,
@@ -68,6 +76,7 @@ def get_player(player_id: int, db: Session = Depends(get_db)) -> PlayerRead:
         guild_role_ids=player.guild_role_ids,
         last_synced_at=player.last_synced_at,
         aggregate=aggregate,
+        class_stats=class_stats,
     )
 
 
@@ -85,7 +94,6 @@ def get_leaderboard(
             steam_name=player.steam_name,
             matches_played=aggregate.matches_played,
             wins=aggregate.wins,
-            draws=aggregate.draws,
             losses=aggregate.losses,
             win_percentage=(
                 aggregate.wins / (aggregate.wins + aggregate.losses) * 100

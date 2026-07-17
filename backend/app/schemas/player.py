@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PlayerAggregateRead(BaseModel):
@@ -33,6 +33,20 @@ class PlayerRead(BaseModel):
     guild_role_ids: list[str]
     last_synced_at: datetime | None
     aggregate: PlayerAggregateRead | None = None
+    class_stats: list["PlayerClassStatsRead"] = Field(default_factory=list)
+
+
+class PlayerClassStatsRead(BaseModel):
+    class_name: str
+    matches_played: int
+    wins: int
+    losses: int
+    win_percentage: float
+    kills: int
+    deaths: int
+    assists: int
+    kill_death_ratio: float
+    damage_per_minute: float
 
 
 class MeResponse(BaseModel):

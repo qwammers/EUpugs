@@ -74,6 +74,20 @@ export interface PlayerRead {
   guild_role_ids: string[];
   last_synced_at: string | null;
   aggregate: Aggregate | null;
+  class_stats: PlayerClassStats[];
+}
+
+export interface PlayerClassStats {
+  class_name: string;
+  matches_played: number;
+  wins: number;
+  losses: number;
+  win_percentage: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kill_death_ratio: number;
+  damage_per_minute: number;
 }
 
 export interface MeResponse {
@@ -88,7 +102,6 @@ export interface LeaderboardEntry {
   steam_name: string | null;
   matches_played: number;
   wins: number;
-  draws: number;
   losses: number;
   win_percentage: number;
   average_kills: number;

@@ -352,6 +352,24 @@ code {
   font-weight: 800;
 }
 
+.win-rate-good {
+  color: var(--good);
+  font-weight: 800;
+}
+
+.win-rate-bad {
+  color: #b12d25;
+  font-weight: 800;
+}
+
+.class-stats-table {
+  min-width: 760px;
+}
+
+.class-name {
+  text-transform: capitalize;
+}
+
 @media (max-width: 900px) {
   .hero,
   .page-grid,

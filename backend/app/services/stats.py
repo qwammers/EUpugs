@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
 from app.clients.logstf_client import LogsTfClient
@@ -111,6 +111,83 @@ class StatsService:
         )
         return list(rows.all())
 
+    def get_player_class_stats(self, player_id: int) -> list[dict[str, str | int | float]]:
+        rows = self.db.scalars(
+            select(PlayerMatchStat).where(PlayerMatchStat.player_id == player_id)
+        )
+        totals: dict[str, dict[str, int]] = {}
+        for stat in rows:
+            breakdown = stat.class_breakdown or {}
+            if not breakdown:
+                continue
+            majority_class = max(
+                breakdown,
+                key=lambda name: (breakdown[name].get("total_time", 0), name),
+            )
+            for class_name, class_row in breakdown.items():
+                total = totals.setdefault(
+                    class_name,
+                    {
+                        "matches_played": 0,
+                        "wins": 0,
+                        "losses": 0,
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "damage": 0,
+                        "time": 0,
+                    },
+                )
+                total["kills"] += class_row.get("kills", 0)
+                total["deaths"] += class_row.get("deaths", 0)
+                total["assists"] += class_row.get("assists", 0)
+                total["damage"] += class_row.get("damage", 0)
+                total["time"] += class_row.get("total_time", 0)
+                if class_name == majority_class:
+                    total["matches_played"] += 1
+                    total["wins"] += int(stat.result == "win")
+                    total["losses"] += int(stat.result == "loss")
+
+        result: list[dict[str, str | int | float]] = []
+        for class_name, total in totals.items():
+            decided = total["wins"] + total["losses"]
+            result.append(
+                {
+                    "class_name": class_name,
+                    "matches_played": total["matches_played"],
+                    "wins": total["wins"],
+                    "losses": total["losses"],
+                    "win_percentage": total["wins"] / decided * 100 if decided else 0,
+                    "kills": total["kills"],
+                    "deaths": total["deaths"],
+                    "assists": total["assists"],
+                    "kill_death_ratio": (
+                        total["kills"] / total["deaths"]
+                        if total["deaths"]
+                        else total["kills"]
+                    ),
+                    "damage_per_minute": (
+                        total["damage"] / total["time"] * 60 if total["time"] else 0
+                    ),
+                }
+            )
+        return sorted(result, key=lambda row: (-int(row["matches_played"]), str(row["class_name"])))
+
+    def rebuild_aggregates(self) -> int:
+        stats = list(self.db.scalars(select(PlayerMatchStat).order_by(PlayerMatchStat.id)))
+        self.db.execute(delete(PlayerAggregate))
+        self.db.flush()
+        for instance in list(self.db.identity_map.values()):
+            if isinstance(instance, PlayerAggregate):
+                self.db.expunge(instance)
+        for stat in stats:
+            stat.combat_damage, stat.combat_time_seconds = self._combat_totals(
+                stat.class_breakdown or {}
+            )
+            self._update_aggregate(stat.player_id, stat)
+        self.db.commit()
+        return len(stats)
+
     def _ingest_log_payload(
         self,
         payload: dict,
@@ -175,11 +252,7 @@ class StatsService:
                 }
                 for item in stats.get("class_stats", [])
             }
-            combat_classes = [
-                item for item in stats.get("class_stats", []) if item.get("type") != "medic"
-            ]
-            combat_damage = sum(item.get("dmg", 0) for item in combat_classes)
-            combat_time_seconds = sum(item.get("total_time", 0) for item in combat_classes)
+            combat_damage, combat_time_seconds = self._combat_totals(class_breakdown)
             row = PlayerMatchStat(
                 player_id=player.id,
                 match_id=match_id,
@@ -227,6 +300,16 @@ class StatsService:
         player.name_frequencies = frequencies
         if not player.username_locked:
             player.display_name = min(frequencies, key=lambda value: (-frequencies[value], value.lower()))
+
+    @staticmethod
+    def _combat_totals(class_breakdown: dict) -> tuple[int, int]:
+        combat_classes = [
+            row for class_name, row in class_breakdown.items() if class_name != "medic"
+        ]
+        return (
+            sum(row.get("damage", 0) for row in combat_classes),
+            sum(row.get("total_time", 0) for row in combat_classes),
+        )
 
     def _update_aggregate(self, player_id: int, stat: PlayerMatchStat) -> None:
         aggregate = self.db.scalar(select(PlayerAggregate).where(PlayerAggregate.player_id == player_id))
