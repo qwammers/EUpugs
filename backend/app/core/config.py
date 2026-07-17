@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     discord_log_channel_id: str = Field(alias="DISCORD_LOG_CHANNEL_ID")
     discord_admin_role_ids: str = Field(default="", alias="DISCORD_ADMIN_ROLE_IDS")
     frontend_origin: str = Field(alias="FRONTEND_ORIGIN")
+    frontend_url: str | None = Field(default=None, alias="FRONTEND_URL")
     api_base_url: str = Field(alias="API_BASE_URL")
     enable_auto_migrate: bool = Field(default=True, alias="ENABLE_AUTO_MIGRATE")
     logstf_sync_limit: int = Field(default=20, alias="LOGSTF_SYNC_LIMIT")
@@ -29,8 +30,11 @@ class Settings(BaseSettings):
     def admin_role_ids(self) -> list[str]:
         return [value.strip() for value in self.discord_admin_role_ids.split(",") if value.strip()]
 
+    @property
+    def login_redirect_url(self) -> str:
+        return (self.frontend_url or self.frontend_origin).rstrip("/")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

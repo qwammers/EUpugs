@@ -9,12 +9,30 @@ import type {
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const SESSION_TOKEN_KEY = "hostedpugs_session_token";
+
+function captureOAuthSession(): void {
+  const queryIndex = window.location.hash.indexOf("?");
+  if (queryIndex < 0) return;
+
+  const route = window.location.hash.slice(0, queryIndex) || "#/";
+  const params = new URLSearchParams(window.location.hash.slice(queryIndex + 1));
+  const token = params.get("session_token");
+  if (!token) return;
+
+  localStorage.setItem(SESSION_TOKEN_KEY, token);
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${route}`);
+}
+
+captureOAuthSession();
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -36,7 +54,13 @@ export const api = {
   apiBaseUrl: API_BASE_URL,
   loginUrl: `${API_BASE_URL}/auth/discord/start`,
   getMe: () => request<MeResponse>("/api/me"),
-  logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
+  logout: async () => {
+    try {
+      return await request<{ message: string }>("/auth/logout", { method: "POST" });
+    } finally {
+      localStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  },
   getQueue: () => request<QueueState>("/api/queue"),
   joinQueue: (classes: string[], queueBucket: QueueBucketName = "active") =>
     request<QueueState>("/api/queue/join", {

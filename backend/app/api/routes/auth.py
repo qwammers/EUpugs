@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import secrets
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -43,7 +44,8 @@ async def discord_callback(
     service = AuthService(db, settings)
     _, session_token = await service.complete_discord_login(code)
 
-    response = RedirectResponse(url=settings.frontend_origin, status_code=status.HTTP_302_FOUND)
+    redirect_url = f"{settings.login_redirect_url}/#/?session_token={quote(session_token)}"
+    response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_token,
@@ -60,10 +62,13 @@ async def discord_callback(
 def logout(
     request: Request,
     response: Response,
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings_dep),
 ) -> MessageResponse:
     token = request.cookies.get(settings.session_cookie_name)
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
     AuthService(db, settings).logout(token)
     response.delete_cookie(settings.session_cookie_name)
     return MessageResponse(message="Logged out.")
