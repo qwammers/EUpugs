@@ -90,12 +90,37 @@ async def test_historical_import_creates_provisional_player_and_is_idempotent() 
 
         aggregate.combat_damage = 0
         aggregate.combat_time_seconds = 0
+        db.add(
+            PlayerMatchStat(
+                player_id=player.id,
+                log_id=124,
+                kills=10,
+                deaths=5,
+                assists=2,
+                damage=3000,
+                healing=0,
+                class_breakdown={
+                    "scout": {
+                        "kills": 10,
+                        "deaths": 5,
+                        "assists": 2,
+                        "damage": 3000,
+                        "total_time": 600,
+                    }
+                },
+                won=False,
+                result="loss",
+                combat_damage=0,
+                combat_time_seconds=0,
+            )
+        )
         db.commit()
-        assert service.rebuild_aggregates() == 1
+        assert service.rebuild_aggregates() == 2
         rebuilt = db.scalar(select(PlayerAggregate))
         assert rebuilt is not None
-        assert rebuilt.combat_damage == 6000
-        assert rebuilt.combat_time_seconds == 1200
+        assert rebuilt.matches_played == 2
+        assert rebuilt.combat_damage == 9000
+        assert rebuilt.combat_time_seconds == 1800
 
 
 def test_most_common_observed_name_changes_only_until_admin_lock() -> None:

@@ -312,7 +312,18 @@ class StatsService:
         )
 
     def _update_aggregate(self, player_id: int, stat: PlayerMatchStat) -> None:
-        aggregate = self.db.scalar(select(PlayerAggregate).where(PlayerAggregate.player_id == player_id))
+        aggregate = next(
+            (
+                row
+                for row in self.db.new
+                if isinstance(row, PlayerAggregate) and row.player_id == player_id
+            ),
+            None,
+        )
+        if not aggregate:
+            aggregate = self.db.scalar(
+                select(PlayerAggregate).where(PlayerAggregate.player_id == player_id)
+            )
         if not aggregate:
             aggregate = PlayerAggregate(
                 player_id=player_id,
