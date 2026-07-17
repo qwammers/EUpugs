@@ -46,7 +46,8 @@ class AuthService:
 
         avatar = user.get("avatar")
         player.discord_username = user["username"]
-        player.display_name = user.get("global_name") or user["username"]
+        if not player.display_name:
+            player.display_name = user.get("global_name") or user["username"]
         player.avatar_url = (
             f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar}.png" if avatar else None
         )

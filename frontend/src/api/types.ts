@@ -49,11 +49,15 @@ export interface MatchRead {
 export interface Aggregate {
   matches_played: number;
   wins: number;
+  draws: number;
+  losses: number;
   kills: number;
   deaths: number;
   assists: number;
   damage: number;
   healing: number;
+  combat_damage: number;
+  combat_time_seconds: number;
   last_log_id: number | null;
 }
 
@@ -62,6 +66,7 @@ export interface PlayerRead {
   discord_user_id: string;
   discord_username: string;
   display_name: string | null;
+  username_locked: boolean;
   avatar_url: string | null;
   steam_id: string | null;
   steam_name: string | null;
@@ -83,14 +88,16 @@ export interface LeaderboardEntry {
   steam_name: string | null;
   matches_played: number;
   wins: number;
-  kills: number;
-  deaths: number;
-  assists: number;
-  damage: number;
-  healing: number;
+  draws: number;
+  losses: number;
+  win_percentage: number;
+  average_kills: number;
+  average_assists: number;
+  average_deaths: number;
+  kill_death_ratio: number;
+  damage_per_minute: number;
 }
 
 export interface RecentMatchListResponse {
   matches: MatchRead[];
 }
-

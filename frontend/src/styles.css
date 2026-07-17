@@ -288,6 +288,70 @@ code {
   font-family: "Cascadia Code", Consolas, monospace;
 }
 
+.leaderboard-panel {
+  overflow: hidden;
+}
+
+.leaderboard-header > div:first-child h1 {
+  margin-bottom: 0.25rem;
+}
+
+.minimum-games {
+  width: 10rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.leaderboard-scroll {
+  overflow-x: auto;
+}
+
+.leaderboard-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 0.7rem 0.6rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.leaderboard-table th:first-child,
+.leaderboard-table td:first-child {
+  position: sticky;
+  left: 0;
+  text-align: left;
+  background: #fbf6ed;
+  z-index: 1;
+}
+
+.leaderboard-table tbody td {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.leaderboard-table tbody td:first-child {
+  border-radius: 14px 0 0 14px;
+  font-weight: 700;
+}
+
+.leaderboard-table tbody td:last-child {
+  border-radius: 0 14px 14px 0;
+}
+
+.sort-button {
+  padding: 0;
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 800;
+}
+
 @media (max-width: 900px) {
   .hero,
   .page-grid,
@@ -307,4 +371,3 @@ code {
     font-size: 0.9rem;
   }
 }
-

@@ -12,6 +12,8 @@ interface AdminPageProps {
 export function AdminPage({ me, queue, currentMatch, refreshAll }: AdminPageProps) {
   const [mapName, setMapName] = useState("");
   const [logInput, setLogInput] = useState("");
+  const [playerId, setPlayerId] = useState("");
+  const [playerUsername, setPlayerUsername] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -136,7 +138,30 @@ export function AdminPage({ me, queue, currentMatch, refreshAll }: AdminPageProp
         <p>Next queue: {queue?.next.count ?? 0}</p>
         <p>Current match: {currentMatch ? `#${currentMatch.id} (${currentMatch.status})` : "none"}</p>
       </section>
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Player username</h2>
+        </div>
+        <label>
+          Player ID
+          <input type="number" min="1" value={playerId} onChange={(event) => setPlayerId(event.target.value)} />
+        </label>
+        <label>
+          Static site username
+          <input value={playerUsername} onChange={(event) => setPlayerUsername(event.target.value)} maxLength={100} />
+        </label>
+        <div className="button-row">
+          <button
+            disabled={busy || !playerId || !playerUsername.trim()}
+            onClick={() => void run(
+              () => api.updatePlayerUsername(Number(playerId), playerUsername),
+              "Updated and locked the player's site username.",
+            )}
+          >
+            Update username
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
-

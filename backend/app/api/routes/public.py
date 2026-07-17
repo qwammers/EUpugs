@@ -60,6 +60,7 @@ def get_player(player_id: int, db: Session = Depends(get_db)) -> PlayerRead:
         discord_user_id=player.discord_user_id,
         discord_username=player.discord_username,
         display_name=player.display_name,
+        username_locked=player.username_locked,
         avatar_url=player.avatar_url,
         steam_id=player.steam_id,
         steam_name=player.steam_name,
@@ -84,12 +85,22 @@ def get_leaderboard(
             steam_name=player.steam_name,
             matches_played=aggregate.matches_played,
             wins=aggregate.wins,
-            kills=aggregate.kills,
-            deaths=aggregate.deaths,
-            assists=aggregate.assists,
-            damage=aggregate.damage,
-            healing=aggregate.healing,
+            draws=aggregate.draws,
+            losses=aggregate.losses,
+            win_percentage=(
+                aggregate.wins / (aggregate.wins + aggregate.losses) * 100
+                if aggregate.wins + aggregate.losses
+                else 0
+            ),
+            average_kills=aggregate.kills / aggregate.matches_played,
+            average_assists=aggregate.assists / aggregate.matches_played,
+            average_deaths=aggregate.deaths / aggregate.matches_played,
+            kill_death_ratio=(aggregate.kills / aggregate.deaths if aggregate.deaths else aggregate.kills),
+            damage_per_minute=(
+                aggregate.combat_damage / aggregate.combat_time_seconds * 60
+                if aggregate.combat_time_seconds
+                else 0
+            ),
         )
         for player, aggregate in rows
     ]
-

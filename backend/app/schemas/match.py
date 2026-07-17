@@ -51,13 +51,15 @@ class LeaderboardEntry(BaseModel):
     steam_name: str | None
     matches_played: int
     wins: int
-    kills: int
-    deaths: int
-    assists: int
-    damage: int
-    healing: int
+    draws: int
+    losses: int
+    win_percentage: float
+    average_kills: float
+    average_assists: float
+    average_deaths: float
+    kill_death_ratio: float
+    damage_per_minute: float
 
 
 class RecentMatchListResponse(BaseModel):
     matches: list[MatchRead] = Field(default_factory=list)
-

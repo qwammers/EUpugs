@@ -97,4 +97,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(log.match(/^\d+$/) ? { log_id: Number(log) } : { log_url: log }),
     }),
+  updatePlayerUsername: (id: number, username: string) =>
+    request<PlayerRead>(`/api/admin/players/${id}/username`, {
+      method: "PATCH",
+      body: JSON.stringify({ username }),
+    }),
 };

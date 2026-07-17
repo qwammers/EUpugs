@@ -89,6 +89,7 @@ def get_me(
             discord_user_id=player.discord_user_id,
             discord_username=player.discord_username,
             display_name=player.display_name,
+            username_locked=player.username_locked,
             avatar_url=player.avatar_url,
             steam_id=player.steam_id,
             steam_name=player.steam_name,

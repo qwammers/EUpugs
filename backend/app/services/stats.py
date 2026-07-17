@@ -102,7 +102,7 @@ class StatsService:
         self.db.commit()
         return True
 
-    def get_leaderboard(self, limit: int = 25) -> list[tuple[Player, PlayerAggregate]]:
+    def get_leaderboard(self, limit: int = 500) -> list[tuple[Player, PlayerAggregate]]:
         rows = self.db.execute(
             select(Player, PlayerAggregate)
             .join(PlayerAggregate, PlayerAggregate.player_id == Player.id)
@@ -152,6 +152,9 @@ class StatsService:
                 self.db.flush()
             if not player:
                 continue
+            observed_name = payload.get("names", {}).get(raw_steam_id)
+            if observed_name:
+                self._record_name(player, observed_name)
             existing = self.db.scalar(
                 select(PlayerMatchStat).where(
                     PlayerMatchStat.player_id == player.id, PlayerMatchStat.log_id == log_id
@@ -161,7 +164,7 @@ class StatsService:
                 continue
 
             team = stats.get("team")
-            won = winning_team is not None and team == winning_team
+            result = "draw" if winning_team is None else ("win" if team == winning_team else "loss")
             class_breakdown = {
                 item.get("type", "unknown"): {
                     "kills": item.get("kills", 0),
@@ -172,6 +175,11 @@ class StatsService:
                 }
                 for item in stats.get("class_stats", [])
             }
+            combat_classes = [
+                item for item in stats.get("class_stats", []) if item.get("type") != "medic"
+            ]
+            combat_damage = sum(item.get("dmg", 0) for item in combat_classes)
+            combat_time_seconds = sum(item.get("total_time", 0) for item in combat_classes)
             row = PlayerMatchStat(
                 player_id=player.id,
                 match_id=match_id,
@@ -182,7 +190,10 @@ class StatsService:
                 damage=stats.get("dmg", 0),
                 healing=stats.get("heal", 0),
                 class_breakdown=class_breakdown,
-                won=won,
+                won=result == "win",
+                result=result,
+                combat_damage=combat_damage,
+                combat_time_seconds=combat_time_seconds,
             )
             self.db.add(row)
             self._update_aggregate(player.id, row)
@@ -206,6 +217,17 @@ class StatsService:
             return str(76561197960265728 + int(steam2.group(2)) * 2 + int(steam2.group(1)))
         return value
 
+    @staticmethod
+    def _record_name(player: Player, observed_name: str) -> None:
+        name = observed_name.strip()[:100]
+        if not name:
+            return
+        frequencies = dict(player.name_frequencies or {})
+        frequencies[name] = frequencies.get(name, 0) + 1
+        player.name_frequencies = frequencies
+        if not player.username_locked:
+            player.display_name = min(frequencies, key=lambda value: (-frequencies[value], value.lower()))
+
     def _update_aggregate(self, player_id: int, stat: PlayerMatchStat) -> None:
         aggregate = self.db.scalar(select(PlayerAggregate).where(PlayerAggregate.player_id == player_id))
         if not aggregate:
@@ -213,18 +235,26 @@ class StatsService:
                 player_id=player_id,
                 matches_played=0,
                 wins=0,
+                draws=0,
+                losses=0,
                 kills=0,
                 deaths=0,
                 assists=0,
                 damage=0,
                 healing=0,
+                combat_damage=0,
+                combat_time_seconds=0,
             )
             self.db.add(aggregate)
         aggregate.matches_played += 1
         aggregate.wins += 1 if stat.won else 0
+        aggregate.draws += 1 if stat.result == "draw" else 0
+        aggregate.losses += 1 if stat.result == "loss" else 0
         aggregate.kills += stat.kills
         aggregate.deaths += stat.deaths
         aggregate.assists += stat.assists
         aggregate.damage += stat.damage
         aggregate.healing += stat.healing
+        aggregate.combat_damage += stat.combat_damage
+        aggregate.combat_time_seconds += stat.combat_time_seconds
         aggregate.last_log_id = stat.log_id

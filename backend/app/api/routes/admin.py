@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_settings_dep, require_admin
 from app.core.config import Settings
@@ -13,10 +14,52 @@ from app.schemas.match import (
     MatchRead,
     MatchStateUpdateRequest,
 )
+from app.schemas.player import PlayerAggregateRead, PlayerRead, PlayerUsernameUpdate
 from app.services.match import MatchService
 from app.services.stats import StatsService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+@router.patch("/players/{player_id}/username", response_model=PlayerRead)
+def update_player_username(
+    player_id: int,
+    payload: PlayerUsernameUpdate,
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> PlayerRead:
+    _ = admin
+    username = payload.username.strip()
+    if not username or len(username) > 100:
+        raise HTTPException(status_code=400, detail="Username must be between 1 and 100 characters.")
+    player = db.scalar(
+        select(Player).where(Player.id == player_id).options(joinedload(Player.aggregate))
+    )
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found.")
+    player.display_name = username
+    player.username_locked = True
+    db.commit()
+    db.refresh(player)
+    aggregate = (
+        PlayerAggregateRead.model_validate(player.aggregate, from_attributes=True)
+        if player.aggregate
+        else None
+    )
+    return PlayerRead(
+        id=player.id,
+        discord_user_id=player.discord_user_id,
+        discord_username=player.discord_username,
+        display_name=player.display_name,
+        username_locked=player.username_locked,
+        avatar_url=player.avatar_url,
+        steam_id=player.steam_id,
+        steam_name=player.steam_name,
+        steam_connected=player.steam_connected,
+        guild_role_ids=player.guild_role_ids,
+        last_synced_at=player.last_synced_at,
+        aggregate=aggregate,
+    )
 
 
 @router.post("/matches/create", response_model=MatchRead)
@@ -74,4 +117,3 @@ async def attach_log(
 
     refreshed = match_service.get_match(match_id)
     return MatchService.serialize(refreshed)
-

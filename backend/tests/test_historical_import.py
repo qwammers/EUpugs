@@ -66,5 +66,32 @@ async def test_historical_import_creates_provisional_player_and_is_idempotent() 
         aggregate = db.scalar(select(PlayerAggregate))
         assert aggregate is not None
         assert aggregate.matches_played == 1
+        assert aggregate.wins == 1
+        assert aggregate.draws == 0
+        assert aggregate.losses == 0
         assert aggregate.damage == 6000
+        assert aggregate.combat_damage == 6000
+        assert aggregate.combat_time_seconds == 1200
         assert db.scalar(select(ImportedLog).where(ImportedLog.log_id == 123)) is not None
+
+
+def test_most_common_observed_name_changes_only_until_admin_lock() -> None:
+    player = Player(
+        discord_user_id="logstf:1",
+        discord_username="Original",
+        display_name="Original",
+        username_locked=False,
+        name_frequencies={},
+        guild_role_ids=[],
+    )
+
+    StatsService._record_name(player, "First")
+    StatsService._record_name(player, "Common")
+    StatsService._record_name(player, "Common")
+    assert player.display_name == "Common"
+
+    player.username_locked = True
+    StatsService._record_name(player, "Later")
+    StatsService._record_name(player, "Later")
+    StatsService._record_name(player, "Later")
+    assert player.display_name == "Common"

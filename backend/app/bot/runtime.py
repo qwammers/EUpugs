@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.models.entities import Match, Player
+from app.models.entities import Player
 from app.services.match import MatchService
 from app.services.queue import QueueService
 from app.services.stats import StatsService

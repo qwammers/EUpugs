@@ -6,7 +6,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.constants import MatchStatus, QueueBucket, TEAM_ORDER
-from app.models.entities import Match, MatchSlot, Player, QueueEntry
+from app.models.entities import Match, MatchSlot, Player
 from app.schemas.match import MatchRead, MatchSlotRead
 from app.services.queue import QueueService
 
