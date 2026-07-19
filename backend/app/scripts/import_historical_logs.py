@@ -17,7 +17,9 @@ def parse_args() -> argparse.Namespace:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--file", type=Path, help="Text file containing log IDs or logs.tf URLs.")
     source.add_argument("--channel-id", type=int, help="Discord channel whose full history is scanned.")
-    parser.add_argument("--limit", type=int, default=None, help="Optional newest-message limit.")
+    history = parser.add_mutually_exclusive_group()
+    history.add_argument("--limit", type=int, default=None, help="Import the oldest N messages.")
+    history.add_argument("--latest", type=int, default=None, help="Import the newest N messages.")
     return parser.parse_args()
 
 
@@ -25,7 +27,11 @@ def ids_from_file(path: Path) -> set[int]:
     return LogsTfClient().parse_log_ids(path.read_text(encoding="utf-8"))
 
 
-async def ids_from_discord(channel_id: int, limit: int | None) -> set[int]:
+async def ids_from_discord(
+    channel_id: int,
+    limit: int | None,
+    latest: int | None,
+) -> set[int]:
     settings = get_settings()
     intents = discord.Intents.default()
     intents.message_content = True
@@ -39,7 +45,11 @@ async def ids_from_discord(channel_id: int, limit: int | None) -> set[int]:
             if not isinstance(channel, discord.abc.Messageable):
                 raise RuntimeError("The configured channel does not contain messages.")
             parser = LogsTfClient()
-            async for message in channel.history(limit=limit, oldest_first=True):
+            message_limit = latest if latest is not None else limit
+            async for message in channel.history(
+                limit=message_limit,
+                oldest_first=latest is None,
+            ):
                 parts = [message.content]
                 for embed in message.embeds:
                     parts.extend([embed.url or "", embed.title or "", embed.description or ""])
@@ -75,7 +85,7 @@ async def main() -> None:
         log_ids = ids_from_file(args.file)
         source = f"file:{args.file.name}"
     else:
-        log_ids = await ids_from_discord(args.channel_id, args.limit)
+        log_ids = await ids_from_discord(args.channel_id, args.limit, args.latest)
         source = f"discord_channel:{args.channel_id}"
     print(f"Found {len(log_ids)} unique logs.tf logs")
     await import_logs(log_ids, source)
