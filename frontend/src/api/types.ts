@@ -8,6 +8,9 @@ export interface QueuePlayer {
   ready: boolean;
   joined_at: string;
   classes: string[];
+  primary_class: string;
+  flex_classes: string[];
+  pre_ready_expires_at: string | null;
 }
 
 export interface QueueBucket {
@@ -21,6 +24,12 @@ export interface QueueState {
   next: QueueBucket;
   matchable: boolean;
   needed_by_class: Record<string, number>;
+  phase: "waiting" | "ready_check";
+  ready_check_id: string | null;
+  ready_check_expires_at: string | null;
+  map_candidates: string[];
+  map_votes: Record<string, number>;
+  blocked_classes: string[];
 }
 
 export interface MatchSlot {
@@ -44,6 +53,18 @@ export interface MatchRead {
   completed_at: string | null;
   log_ids: number[];
   slots: MatchSlot[];
+  voice_channel_url: string | null;
+  substitutions: MatchSubstitution[];
+}
+
+export interface MatchSubstitution {
+  outgoing_player_id: number;
+  outgoing_name: string;
+  incoming_player_id: number;
+  incoming_name: string;
+  assigned_class: string;
+  team: string;
+  created_at: string;
 }
 
 export interface Aggregate {
@@ -113,4 +134,18 @@ export interface LeaderboardEntry {
 
 export interface RecentMatchListResponse {
   matches: MatchRead[];
+}
+
+export interface Etf2lReview {
+  player_id: number;
+  display_name: string;
+  steam_id: string | null;
+  etf2l_player_id: number | null;
+  profile_url: string | null;
+  recent_division: string | null;
+  highest_division: string | null;
+  skill_band: string | null;
+  decision: string | null;
+  checked_at: string | null;
+  evidence: Record<string, unknown>;
 }

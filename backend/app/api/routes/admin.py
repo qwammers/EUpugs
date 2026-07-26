@@ -13,9 +13,18 @@ from app.schemas.match import (
     MatchCreateRequest,
     MatchRead,
     MatchStateUpdateRequest,
+    MatchSubstitutionRequest,
 )
-from app.schemas.player import PlayerAggregateRead, PlayerRead, PlayerUsernameUpdate
+from app.schemas.player import (
+    Etf2lDecisionRequest,
+    PlayerAggregateRead,
+    PlayerRead,
+    PlayerUsernameUpdate,
+)
+from app.schemas.queue import MapCandidatesRequest, QueueStateResponse
+from app.services.etf2l import Etf2lService
 from app.services.match import MatchService
+from app.services.queue import QueueService
 from app.services.stats import StatsService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -117,3 +126,96 @@ async def attach_log(
 
     refreshed = match_service.get_match(match_id)
     return MatchService.serialize(refreshed)
+
+
+@router.post("/queue/maps", response_model=QueueStateResponse)
+def set_map_candidates(
+    payload: MapCandidatesRequest,
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> QueueStateResponse:
+    service = QueueService(db)
+    try:
+        service.set_map_candidates(payload.maps)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return service.build_queue_state(admin)
+
+
+@router.post("/matches/{match_id}/substitute", response_model=MatchRead)
+def substitute_player(
+    match_id: int,
+    payload: MatchSubstitutionRequest,
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> MatchRead:
+    service = MatchService(db)
+    try:
+        match = service.substitute(
+            match_id, payload.outgoing_player_id, payload.incoming_player_id, admin
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return service.serialize(match)
+
+
+def _etf2l_summary(player: Player) -> dict:
+    return {
+        "player_id": player.id,
+        "display_name": player.display_name or player.discord_username,
+        "steam_id": player.steam_id,
+        "etf2l_player_id": player.etf2l_player_id,
+        "profile_url": player.etf2l_profile_url,
+        "recent_division": player.etf2l_recent_division,
+        "highest_division": player.etf2l_highest_division,
+        "skill_band": player.etf2l_skill_band,
+        "decision": player.etf2l_decision,
+        "checked_at": player.etf2l_checked_at,
+        "evidence": player.etf2l_evidence,
+    }
+
+
+@router.get("/etf2l/reviews")
+def list_etf2l_reviews(
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    _ = admin
+    players = db.scalars(
+        select(Player)
+        .where(Player.etf2l_decision == "manual_review")
+        .order_by(Player.etf2l_checked_at.desc())
+    )
+    return [_etf2l_summary(player) for player in players]
+
+
+@router.post("/players/{player_id}/etf2l/refresh")
+async def refresh_etf2l(
+    player_id: int,
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings_dep),
+) -> dict:
+    _ = admin
+    player = db.get(Player, player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found.")
+    return _etf2l_summary(await Etf2lService(db, settings).refresh(player, force=True))
+
+
+@router.post("/players/{player_id}/etf2l/decision")
+def decide_etf2l(
+    player_id: int,
+    payload: Etf2lDecisionRequest,
+    admin: Player = Depends(require_admin),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings_dep),
+) -> dict:
+    player = db.get(Player, player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found.")
+    try:
+        result = Etf2lService(db, settings).decide(player, admin, payload.decision)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _etf2l_summary(result)

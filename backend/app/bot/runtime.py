@@ -5,11 +5,12 @@ from typing import cast
 
 import discord
 from discord import app_commands
+from discord.ext import tasks
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.models.entities import Player
+from app.models.entities import MatchSlot, Player
 from app.services.match import MatchService
 from app.services.queue import QueueService
 from app.services.stats import StatsService
@@ -21,16 +22,97 @@ class HostedPugsBot(discord.Client):
     def __init__(self) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self._match_role_members: set[int] = set()
 
     async def setup_hook(self) -> None:
         guild = discord.Object(id=int(settings.discord_guild_id))
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
+        self.lifecycle_loop.start()
 
     async def on_ready(self) -> None:
         print(f"Logged in as {self.user}")
+
+    async def close(self) -> None:
+        self.lifecycle_loop.cancel()
+        await super().close()
+
+    @tasks.loop(seconds=10)
+    async def lifecycle_loop(self) -> None:
+        await asyncio.to_thread(self._process_queue)
+        await self._reconcile_roles()
+
+    @lifecycle_loop.before_loop
+    async def before_lifecycle_loop(self) -> None:
+        await self.wait_until_ready()
+
+    def _process_queue(self) -> None:
+        with SessionLocal() as db:
+            service = QueueService(db)
+            state = service.build_queue_state()
+            if state.phase == "ready_check":
+                from app.models.entities import QueueCycle
+
+                cycle = db.scalar(select(QueueCycle).where(QueueCycle.queue_bucket == "active"))
+                if cycle and not cycle.announced_at:
+                    cycle.announced_at = cycle.ready_check_expires_at
+                    db.commit()
+                    channel = self.get_channel(int(settings.discord_log_channel_id))
+                    if channel:
+                        asyncio.run_coroutine_threadsafe(
+                            channel.send("Queue is full. Ready up within 45 seconds!"),
+                            self.loop,
+                        )
+            service.process_ready_check()
+
+    async def _reconcile_roles(self) -> None:
+        guild = self.get_guild(int(settings.discord_guild_id))
+        if not guild:
+            return
+        desired: set[int] = set()
+        with SessionLocal() as db:
+            match = MatchService(db).get_current_match()
+            if match and match.status == "live":
+                desired = {
+                    int(value)
+                    for value in db.scalars(
+                        select(Player.discord_user_id)
+                        .join(MatchSlot, MatchSlot.player_id == Player.id)
+                        .where(MatchSlot.match_id == match.id)
+                    )
+                }
+            approved = [
+                int(value)
+                for value in db.scalars(
+                    select(Player.discord_user_id).where(Player.etf2l_decision == "accepted")
+                )
+            ]
+        if settings.discord_match_role_id:
+            role = guild.get_role(int(settings.discord_match_role_id))
+            if role:
+                current_role_members = {member.id for member in role.members}
+                for user_id in desired | self._match_role_members | current_role_members:
+                    member = guild.get_member(user_id)
+                    if not member:
+                        continue
+                    if user_id in desired and role not in member.roles:
+                        await member.add_roles(role, reason="PUG match access")
+                    elif user_id not in desired and role in member.roles:
+                        await member.remove_roles(role, reason="PUG match ended")
+                self._match_role_members = desired
+        if settings.discord_approved_role_id:
+            role = guild.get_role(int(settings.discord_approved_role_id))
+            if role:
+                approved_ids = set(approved)
+                for user_id in approved_ids | {member.id for member in role.members}:
+                    member = guild.get_member(user_id)
+                    if member and user_id in approved_ids and role not in member.roles:
+                        await member.add_roles(role, reason="ETF2L screening accepted")
+                    elif member and user_id not in approved_ids and role in member.roles:
+                        await member.remove_roles(role, reason="ETF2L screening changed")
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
@@ -63,8 +145,10 @@ def ensure_player(db, user: discord.User | discord.Member) -> Player | None:
 
 
 @bot.tree.command(name="queue", description="Join the active pug queue.")
-@app_commands.describe(classes="Comma-separated classes, for example scout,soldier")
-async def queue_command(interaction: discord.Interaction, classes: str) -> None:
+@app_commands.describe(primary_class="Primary class", flex_classes="Optional comma-separated flex classes")
+async def queue_command(
+    interaction: discord.Interaction, primary_class: str, flex_classes: str = ""
+) -> None:
     await interaction.response.defer(ephemeral=True)
     with SessionLocal() as db:
         player = ensure_player(db, cast(discord.User, interaction.user))
@@ -74,7 +158,8 @@ async def queue_command(interaction: discord.Interaction, classes: str) -> None:
         try:
             QueueService(db).join_queue(
                 player,
-                [value.strip().lower() for value in classes.split(",") if value.strip()],
+                primary_class.strip().lower(),
+                [value.strip().lower() for value in flex_classes.split(",") if value.strip()],
                 "active",
             )
         except ValueError as exc:
@@ -108,6 +193,21 @@ async def ready_command(interaction: discord.Interaction, is_ready: bool) -> Non
     await interaction.response.send_message(f"Ready set to {is_ready}.", ephemeral=True)
 
 
+@bot.tree.command(name="pre-ready", description="Auto-ready for checks starting in the next 3 minutes.")
+async def pre_ready_command(interaction: discord.Interaction) -> None:
+    with SessionLocal() as db:
+        player = ensure_player(db, cast(discord.User, interaction.user))
+        if not player:
+            await interaction.response.send_message("Please log into the site first.", ephemeral=True)
+            return
+        try:
+            QueueService(db).set_pre_ready(player)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+    await interaction.response.send_message("Pre-ready enabled for 3 minutes.", ephemeral=True)
+
+
 @bot.tree.command(name="status", description="Show current queue and match status.")
 async def status_command(interaction: discord.Interaction) -> None:
     with SessionLocal() as db:
@@ -123,8 +223,10 @@ async def status_command(interaction: discord.Interaction) -> None:
 
 
 @bot.tree.command(name="next", description="Join the next-match opt-in queue.")
-@app_commands.describe(classes="Comma-separated classes, for example scout,soldier")
-async def next_command(interaction: discord.Interaction, classes: str) -> None:
+@app_commands.describe(primary_class="Primary class", flex_classes="Optional comma-separated flex classes")
+async def next_command(
+    interaction: discord.Interaction, primary_class: str, flex_classes: str = ""
+) -> None:
     with SessionLocal() as db:
         player = ensure_player(db, cast(discord.User, interaction.user))
         if not player:
@@ -133,7 +235,8 @@ async def next_command(interaction: discord.Interaction, classes: str) -> None:
         try:
             QueueService(db).join_queue(
                 player,
-                [value.strip().lower() for value in classes.split(",") if value.strip()],
+                primary_class.strip().lower(),
+                [value.strip().lower() for value in flex_classes.split(",") if value.strip()],
                 "next",
             )
         except ValueError as exc:

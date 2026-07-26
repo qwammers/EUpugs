@@ -26,6 +26,8 @@ class MatchRead(BaseModel):
     completed_at: datetime | None
     log_ids: list[int]
     slots: list[MatchSlotRead]
+    voice_channel_url: str | None = None
+    substitutions: list["MatchSubstitutionRead"] = Field(default_factory=list)
 
 
 class MatchCreateRequest(BaseModel):
@@ -62,3 +64,18 @@ class LeaderboardEntry(BaseModel):
 
 class RecentMatchListResponse(BaseModel):
     matches: list[MatchRead] = Field(default_factory=list)
+
+
+class MatchSubstitutionRead(BaseModel):
+    outgoing_player_id: int
+    outgoing_name: str
+    incoming_player_id: int
+    incoming_name: str
+    assigned_class: str
+    team: str
+    created_at: datetime
+
+
+class MatchSubstitutionRequest(BaseModel):
+    outgoing_player_id: int
+    incoming_player_id: int

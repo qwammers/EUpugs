@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import json
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,12 @@ class Settings(BaseSettings):
     discord_guild_id: str = Field(alias="DISCORD_GUILD_ID")
     discord_log_channel_id: str = Field(alias="DISCORD_LOG_CHANNEL_ID")
     discord_admin_role_ids: str = Field(default="", alias="DISCORD_ADMIN_ROLE_IDS")
+    discord_match_role_id: str = Field(default="", alias="DISCORD_MATCH_ROLE_ID")
+    discord_voice_channel_id: str = Field(default="", alias="DISCORD_VOICE_CHANNEL_ID")
+    discord_approved_role_id: str = Field(default="", alias="DISCORD_APPROVED_ROLE_ID")
+    discord_class_restrictions: str = Field(default="{}", alias="DISCORD_CLASS_RESTRICTIONS")
+    etf2l_api_base_url: str = Field(default="https://api-v2.etf2l.org", alias="ETF2L_API_BASE_URL")
+    etf2l_history_page_limit: int = Field(default=5, alias="ETF2L_HISTORY_PAGE_LIMIT")
     frontend_origin: str = Field(alias="FRONTEND_ORIGIN")
     frontend_url: str | None = Field(default=None, alias="FRONTEND_URL")
     api_base_url: str = Field(alias="API_BASE_URL")
@@ -29,6 +36,11 @@ class Settings(BaseSettings):
     @property
     def admin_role_ids(self) -> list[str]:
         return [value.strip() for value in self.discord_admin_role_ids.split(",") if value.strip()]
+
+    @property
+    def class_restrictions(self) -> dict[str, list[str]]:
+        value = json.loads(self.discord_class_restrictions or "{}")
+        return {str(role): [str(item).lower() for item in classes] for role, classes in value.items()}
 
     @property
     def login_redirect_url(self) -> str:

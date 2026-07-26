@@ -44,6 +44,7 @@ export function Shell({ me, loginHref, onLogout, children }: ShellProps) {
         <NavLink to="/">Home</NavLink>
         <NavLink to="/queue">Queue</NavLink>
         <NavLink to="/leaderboard">Leaderboard</NavLink>
+        <NavLink to="/matches">Matches</NavLink>
         <NavLink to="/admin">Admin</NavLink>
       </nav>
       <main className="content">{children}</main>

@@ -7,7 +7,7 @@ from app.api.deps import get_current_player
 from app.db.session import get_db
 from app.models.entities import Player
 from app.schemas.common import MessageResponse
-from app.schemas.queue import QueueJoinRequest, QueueLeaveRequest, QueueStateResponse
+from app.schemas.queue import MapVoteRequest, QueueJoinRequest, QueueLeaveRequest, QueueStateResponse
 from app.services.queue import QueueService
 
 router = APIRouter(prefix="/api/queue", tags=["queue"])
@@ -21,10 +21,15 @@ def join_queue(
 ) -> QueueStateResponse:
     service = QueueService(db)
     try:
-        service.join_queue(player, payload.classes, payload.queue_bucket)
+        classes = payload.classes or []
+        primary = payload.primary_class or (classes[0] if classes else None)
+        flex = payload.flex_classes or classes[1:]
+        if not primary:
+            raise ValueError("A primary class is required.")
+        service.join_queue(player, primary, flex, payload.queue_bucket)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return service.build_queue_state()
+    return service.build_queue_state(player)
 
 
 @router.post("/leave", response_model=QueueStateResponse)
@@ -35,7 +40,7 @@ def leave_queue(
 ) -> QueueStateResponse:
     service = QueueService(db)
     service.leave_queue(player, payload.queue_bucket)
-    return service.build_queue_state()
+    return service.build_queue_state(player)
 
 
 @router.post("/ready", response_model=MessageResponse)
@@ -49,3 +54,30 @@ def set_ready(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return MessageResponse(message=f"Ready state updated to {ready}.")
+
+
+@router.post("/pre-ready", response_model=QueueStateResponse)
+def set_pre_ready(
+    player: Player = Depends(get_current_player),
+    db: Session = Depends(get_db),
+) -> QueueStateResponse:
+    service = QueueService(db)
+    try:
+        service.set_pre_ready(player)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return service.build_queue_state(player)
+
+
+@router.post("/map-vote", response_model=QueueStateResponse)
+def vote_map(
+    payload: MapVoteRequest,
+    player: Player = Depends(get_current_player),
+    db: Session = Depends(get_db),
+) -> QueueStateResponse:
+    service = QueueService(db)
+    try:
+        service.vote_map(player, payload.map_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return service.build_queue_state(player)

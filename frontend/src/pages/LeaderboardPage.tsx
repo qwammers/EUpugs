@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { api } from "../api/client";
 import type { LeaderboardEntry } from "../api/types";
 
 interface LeaderboardPageProps {
@@ -35,14 +36,29 @@ const format = (value: number) => value.toFixed(1);
 
 export function LeaderboardPage({ entries }: LeaderboardPageProps) {
   const [minimumGames, setMinimumGames] = useState(0);
+  const [search, setSearch] = useState("");
+  const [className, setClassName] = useState("");
+  const [classEntries, setClassEntries] = useState<LeaderboardEntry[] | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("matches_played");
   const [descending, setDescending] = useState(true);
+  useEffect(() => {
+    if (!className) {
+      setClassEntries(null);
+      return;
+    }
+    void api.getLeaderboard(className).then(setClassEntries);
+  }, [className]);
+  const sourceEntries = classEntries ?? entries;
   const visibleEntries = useMemo(
-    () => entries.filter((entry) => entry.matches_played >= minimumGames).sort((left, right) => {
+    () => sourceEntries.filter((entry) => {
+      const name = entry.display_name ?? entry.discord_username;
+      return entry.matches_played >= minimumGames
+        && name.toLowerCase().includes(search.trim().toLowerCase());
+    }).sort((left, right) => {
       const difference = left[sortKey] - right[sortKey];
       return descending ? -difference : difference;
     }),
-    [descending, entries, minimumGames, sortKey],
+    [descending, minimumGames, search, sortKey, sourceEntries],
   );
 
   const selectSort = (key: SortKey) => {
@@ -56,11 +72,22 @@ export function LeaderboardPage({ entries }: LeaderboardPageProps) {
   return (
     <section className="panel leaderboard-panel">
       <div className="panel-header leaderboard-header">
-        <div><h1>Leaderboard</h1><span>{visibleEntries.length} of {entries.length} tracked players</span></div>
+        <div><h1>Leaderboard</h1><span>{visibleEntries.length} of {sourceEntries.length} tracked players</span></div>
+        <label className="minimum-games">
+          Search
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Player name" />
+        </label>
         <label className="minimum-games">
           Minimum games
           <input type="number" min="0" value={minimumGames} onChange={(event) => setMinimumGames(Math.max(0, Number(event.target.value) || 0))} />
         </label>
+      </div>
+      <div className="class-filter-row">
+        {["", "scout", "soldier", "demoman", "medic"].map((value) => (
+          <button className={className === value ? "selected" : ""} key={value || "all"} onClick={() => setClassName(value)}>
+            {value || "All classes"}
+          </button>
+        ))}
       </div>
       <div className="leaderboard-scroll">
         <table className="leaderboard-table">

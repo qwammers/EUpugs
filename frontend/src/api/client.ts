@@ -6,6 +6,7 @@ import type {
   QueueBucketName,
   QueueState,
   RecentMatchListResponse,
+  Etf2lReview,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -62,10 +63,14 @@ export const api = {
     }
   },
   getQueue: () => request<QueueState>("/api/queue"),
-  joinQueue: (classes: string[], queueBucket: QueueBucketName = "active") =>
+  joinQueue: (primaryClass: string, flexClasses: string[], queueBucket: QueueBucketName = "active") =>
     request<QueueState>("/api/queue/join", {
       method: "POST",
-      body: JSON.stringify({ classes, queue_bucket: queueBucket }),
+      body: JSON.stringify({
+        primary_class: primaryClass,
+        flex_classes: flexClasses,
+        queue_bucket: queueBucket,
+      }),
     }),
   leaveQueue: (queueBucket: QueueBucketName = "active") =>
     request<QueueState>("/api/queue/leave", {
@@ -73,10 +78,18 @@ export const api = {
       body: JSON.stringify({ queue_bucket: queueBucket }),
     }),
   setReady: (ready: boolean) => request<{ message: string }>(`/api/queue/ready?ready=${ready}`, { method: "POST" }),
+  setPreReady: () => request<QueueState>("/api/queue/pre-ready", { method: "POST" }),
+  voteMap: (mapName: string) =>
+    request<QueueState>("/api/queue/map-vote", {
+      method: "POST",
+      body: JSON.stringify({ map_name: mapName }),
+    }),
   getCurrentMatch: () => request<MatchRead | null>("/api/matches/current"),
   getRecentMatches: () => request<RecentMatchListResponse>("/api/matches/recent"),
+  getMatch: (id: string) => request<MatchRead>(`/api/matches/${id}`),
   getPlayer: (id: string) => request<PlayerRead>(`/api/players/${id}`),
-  getLeaderboard: () => request<LeaderboardEntry[]>("/api/leaderboard"),
+  getLeaderboard: (className?: string) =>
+    request<LeaderboardEntry[]>(`/api/leaderboard${className ? `?class_name=${className}` : ""}`),
   createMatch: (mapName?: string) =>
     request<MatchRead>("/api/admin/matches/create", {
       method: "POST",
@@ -101,5 +114,26 @@ export const api = {
     request<PlayerRead>(`/api/admin/players/${id}/username`, {
       method: "PATCH",
       body: JSON.stringify({ username }),
+    }),
+  setMapCandidates: (maps: string[]) =>
+    request<QueueState>("/api/admin/queue/maps", {
+      method: "POST",
+      body: JSON.stringify({ maps }),
+    }),
+  substitute: (matchId: number, outgoingPlayerId: number, incomingPlayerId: number) =>
+    request<MatchRead>(`/api/admin/matches/${matchId}/substitute`, {
+      method: "POST",
+      body: JSON.stringify({
+        outgoing_player_id: outgoingPlayerId,
+        incoming_player_id: incomingPlayerId,
+      }),
+    }),
+  getEtf2lReviews: () => request<Etf2lReview[]>("/api/admin/etf2l/reviews"),
+  refreshEtf2l: (playerId: number) =>
+    request<Etf2lReview>(`/api/admin/players/${playerId}/etf2l/refresh`, { method: "POST" }),
+  decideEtf2l: (playerId: number, decision: string) =>
+    request<Etf2lReview>(`/api/admin/players/${playerId}/etf2l/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision }),
     }),
 };

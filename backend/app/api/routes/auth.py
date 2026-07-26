@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.schemas.common import MessageResponse
 from app.schemas.player import MeResponse, PlayerAggregateRead, PlayerRead
 from app.services.auth import AuthService
+from app.services.etf2l import Etf2lService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 api_router = APIRouter(prefix="/api", tags=["auth"])
@@ -42,7 +43,9 @@ async def discord_callback(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state.")
 
     service = AuthService(db, settings)
-    _, session_token = await service.complete_discord_login(code)
+    player, session_token = await service.complete_discord_login(code)
+    if player.steam_id:
+        await Etf2lService(db, settings).refresh(player)
 
     redirect_url = f"{settings.login_redirect_url}/#/?session_token={quote(session_token)}"
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)

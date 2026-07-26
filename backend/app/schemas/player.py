@@ -34,6 +34,13 @@ class PlayerRead(BaseModel):
     last_synced_at: datetime | None
     aggregate: PlayerAggregateRead | None = None
     class_stats: list["PlayerClassStatsRead"] = Field(default_factory=list)
+    etf2l_player_id: int | None = None
+    etf2l_profile_url: str | None = None
+    etf2l_recent_division: str | None = None
+    etf2l_highest_division: str | None = None
+    etf2l_skill_band: str | None = None
+    etf2l_decision: str | None = None
+    etf2l_checked_at: datetime | None = None
 
 
 class PlayerClassStatsRead(BaseModel):
@@ -56,3 +63,7 @@ class MeResponse(BaseModel):
 
 class PlayerUsernameUpdate(BaseModel):
     username: str
+
+
+class Etf2lDecisionRequest(BaseModel):
+    decision: str

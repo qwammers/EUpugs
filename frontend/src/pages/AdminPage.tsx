@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { MatchRead, MeResponse, QueueState } from "../api/types";
+import type { Etf2lReview, MatchRead, MeResponse, QueueState } from "../api/types";
 
 interface AdminPageProps {
   me: MeResponse | null;
@@ -11,11 +11,19 @@ interface AdminPageProps {
 
 export function AdminPage({ me, queue, currentMatch, refreshAll }: AdminPageProps) {
   const [mapName, setMapName] = useState("");
+  const [mapCandidates, setMapCandidates] = useState(["", "", ""]);
+  const [outgoingPlayerId, setOutgoingPlayerId] = useState("");
+  const [incomingPlayerId, setIncomingPlayerId] = useState("");
+  const [reviews, setReviews] = useState<Etf2lReview[]>([]);
   const [logInput, setLogInput] = useState("");
   const [playerId, setPlayerId] = useState("");
   const [playerUsername, setPlayerUsername] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (me?.is_admin) void api.getEtf2lReviews().then(setReviews);
+  }, [me?.is_admin]);
 
   const run = async (task: () => Promise<unknown>, success: string) => {
     setBusy(true);
@@ -129,6 +137,51 @@ export function AdminPage({ me, queue, currentMatch, refreshAll }: AdminPageProp
             Attach log
           </button>
         </div>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><h2>Map vote candidates</h2></div>
+        {mapCandidates.map((value, index) => <input
+          key={index}
+          value={value}
+          placeholder={`Map ${index + 1}`}
+          onChange={(event) => setMapCandidates((current) =>
+            current.map((item, itemIndex) => itemIndex === index ? event.target.value : item)
+          )}
+        />)}
+        <div className="button-row"><button disabled={busy || mapCandidates.some((item) => !item.trim())}
+          onClick={() => void run(() => api.setMapCandidates(mapCandidates), "Updated map vote.")}>
+          Open map vote
+        </button></div>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><h2>Live substitution</h2></div>
+        <label>Outgoing player ID<input value={outgoingPlayerId} onChange={(event) => setOutgoingPlayerId(event.target.value)} /></label>
+        <label>Next-queue player ID<input value={incomingPlayerId} onChange={(event) => setIncomingPlayerId(event.target.value)} /></label>
+        <div className="button-row"><button disabled={busy || !currentMatch || !outgoingPlayerId || !incomingPlayerId}
+          onClick={() => void run(
+            () => api.substitute(currentMatch!.id, Number(outgoingPlayerId), Number(incomingPlayerId)),
+            "Substitution recorded.",
+          )}>Accept substitute</button></div>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><h2>ETF2L reviews</h2><span>{reviews.length} pending</span></div>
+        <div className="archive-list">{reviews.map((review) => <div className="archive-row" key={review.player_id}>
+          <strong>{review.display_name}</strong>
+          <span>{review.highest_division ?? "Unknown division"}</span>
+          {review.profile_url ? <a href={review.profile_url} target="_blank" rel="noreferrer">ETF2L</a> : <span>No profile</span>}
+          <div className="button-row">
+            <button disabled={busy} onClick={() => void run(
+              () => api.decideEtf2l(review.player_id, "accepted").then(() =>
+                setReviews((current) => current.filter((item) => item.player_id !== review.player_id))
+              ), "Player accepted.",
+            )}>Accept</button>
+            <button disabled={busy} onClick={() => void run(
+              () => api.decideEtf2l(review.player_id, "rejected").then(() =>
+                setReviews((current) => current.filter((item) => item.player_id !== review.player_id))
+              ), "Player rejected.",
+            )}>Reject</button>
+          </div>
+        </div>)}</div>
       </section>
       <section className="panel">
         <div className="panel-header">

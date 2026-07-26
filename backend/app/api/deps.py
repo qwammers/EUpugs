@@ -29,6 +29,18 @@ def get_current_player(
     return player
 
 
+def get_optional_player(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings_dep),
+) -> Player | None:
+    token = request.cookies.get(settings.session_cookie_name)
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    return AuthService(db, settings).get_player_for_session(token)
+
+
 def require_admin(
     player: Player = Depends(get_current_player),
     settings: Settings = Depends(get_settings_dep),

@@ -9,6 +9,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { HomePage } from "./pages/HomePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { MatchPage } from "./pages/MatchPage";
+import { MatchesPage } from "./pages/MatchesPage";
 import { PlayerPage } from "./pages/PlayerPage";
 import { QueuePage } from "./pages/QueuePage";
 
@@ -84,8 +85,9 @@ function RoutedApp() {
         />
         <Route
           path="/matches/:id"
-          element={<MatchRoute fallback={currentMatchState.data} recent={recentMatchesState.data?.matches ?? []} />}
+          element={<MatchRoute />}
         />
+        <Route path="/matches" element={<MatchesPage matches={recentMatchesState.data?.matches ?? []} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Shell>
@@ -101,15 +103,13 @@ function PlayerRoute() {
   return <PlayerPage player={playerState.data} />;
 }
 
-function MatchRoute({ fallback, recent }: { fallback: MatchRead | null; recent: MatchRead[] }) {
+function MatchRoute() {
   const { id } = useParams();
-  const match = useMemo(() => {
-    const numericId = Number(id);
-    if (!Number.isFinite(numericId)) return null;
-    if (fallback?.id === numericId) return fallback;
-    return recent.find((entry) => entry.id === numericId) ?? null;
-  }, [fallback, id, recent]);
-  return <MatchPage match={match} />;
+  const matchState = useAsyncData<MatchRead | null>(
+    () => id ? api.getMatch(id).catch(() => null) : Promise.resolve(null),
+    [id],
+  );
+  return <MatchPage match={matchState.data} />;
 }
 
 function NotFound() {
