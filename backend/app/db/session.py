@@ -24,10 +24,26 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    alembic_config = Config(str(repository_root / "backend" / "alembic.ini"))
-    alembic_config.set_main_option(
-        "script_location", str(repository_root / "backend" / "alembic")
+    candidates = [
+        Path.cwd() / "backend",
+        Path.cwd(),
+        Path(__file__).resolve().parents[2],
+    ]
+    alembic_root = next(
+        (
+            candidate
+            for candidate in candidates
+            if (candidate / "alembic.ini").is_file() and (candidate / "alembic").is_dir()
+        ),
+        None,
     )
+    if alembic_root is None:
+        raise RuntimeError(
+            "Could not locate alembic.ini and the Alembic scripts. "
+            "Run the command from the repository root."
+        )
+
+    alembic_config = Config(str(alembic_root / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(alembic_root / "alembic"))
     alembic_config.set_main_option("sqlalchemy.url", settings.database_url)
     command.upgrade(alembic_config, "head")

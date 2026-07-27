@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import cast
 
 import discord
@@ -144,7 +145,7 @@ class HostedPugsBot(discord.Client):
                     await member.add_roles(role, reason="Runner-approved skill tier")
 
     async def on_message(self, message: discord.Message) -> None:
-        if message.author.bot:
+        if self.user and message.author.id == self.user.id:
             return
         if str(message.channel.id) != settings.discord_log_channel_id:
             return
@@ -152,19 +153,33 @@ class HostedPugsBot(discord.Client):
         from app.clients.logstf_client import LogsTfClient
 
         client = LogsTfClient()
-        log_id = client.parse_log_id(message.content)
-        if not log_id:
+        parts = [message.content]
+        for embed in message.embeds:
+            parts.extend([embed.url or "", embed.title or "", embed.description or ""])
+            for field in embed.fields:
+                parts.extend([field.name, field.value])
+        log_ids = client.parse_log_ids("\n".join(parts))
+        if not log_ids:
             return
 
-        await asyncio.to_thread(self._attach_latest_pending_log, log_id)
+        for log_id in sorted(log_ids):
+            try:
+                await self._ingest_channel_log(log_id)
+            except Exception:
+                logging.exception("Failed to ingest logs.tf log %s from Discord", log_id)
 
-    def _attach_latest_pending_log(self, log_id: int) -> None:
+    async def _ingest_channel_log(self, log_id: int) -> None:
         with SessionLocal() as db:
             matches = MatchService(db).get_active_matches()
             match = next((item for item in reversed(matches) if item.status == "awaiting_log"), None)
-            if not match:
-                return
-            asyncio.run(StatsService(db, settings).attach_log_to_match(match, log_id))
+            stats = StatsService(db, settings)
+            if match:
+                await stats.attach_log_to_match(match, log_id)
+            else:
+                await stats.import_historical_log(
+                    log_id,
+                    source=f"discord_channel:{settings.discord_log_channel_id}",
+                )
 
 
 bot = HostedPugsBot()
