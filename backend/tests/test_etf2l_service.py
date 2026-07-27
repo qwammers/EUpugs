@@ -4,7 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 from app.services.etf2l import Etf2lService
-from backend.tests.test_queue_service import make_session, seed_player
+from tests.support import make_session, seed_player
 
 
 class FakeClient:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.models.entities import Match, MatchLog, MatchSlot
 from app.services.elo import EloService
-from backend.tests.test_queue_service import make_session, seed_player
+from tests.support import make_session, seed_player
 
 
 def test_equal_team_elo_win_applies_once() -> None:
