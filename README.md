@@ -134,8 +134,14 @@ DISCORD_BOT_TOKEN=
 DISCORD_GUILD_ID=
 DISCORD_LOG_CHANNEL_ID=
 DISCORD_ADMIN_ROLE_IDS=
-DISCORD_MATCH_ROLE_ID=
-DISCORD_VOICE_CHANNEL_ID=
+DISCORD_MATCH1_RED_ROLE_ID=
+DISCORD_MATCH1_RED_VOICE_CHANNEL_ID=
+DISCORD_MATCH1_BLU_ROLE_ID=
+DISCORD_MATCH1_BLU_VOICE_CHANNEL_ID=
+DISCORD_MATCH2_RED_ROLE_ID=
+DISCORD_MATCH2_RED_VOICE_CHANNEL_ID=
+DISCORD_MATCH2_BLU_ROLE_ID=
+DISCORD_MATCH2_BLU_VOICE_CHANNEL_ID=
 DISCORD_APPROVED_ROLE_ID=
 DISCORD_CLASS_RESTRICTIONS={"ROLE_ID":["medic"],"ANOTHER_ROLE_ID":["demo","soldier"]}
 
@@ -164,7 +170,8 @@ curl https://YOUR_HOSTNAME/health
 ```
 
 With `ENABLE_AUTO_MIGRATE=true`, API startup applies pending Alembic migrations to RDS.
-Revision `20260726_0004` preserves existing players, logs, statistics, and queue preferences.
+Revision `20260727_0005` converts the queue to match ownership, merges the old next queue,
+seeds Elo from recognized Discord skill roles, and preserves existing matches, logs, and stats.
 
 ### 5. Deploy GitHub Pages
 

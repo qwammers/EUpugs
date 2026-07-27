@@ -12,6 +12,8 @@ class MatchSlotRead(BaseModel):
     assigned_class: str
     team: str
     slot_order: int
+    elo_at_lock: int = 0
+    elo_delta: int | None = None
 
 
 class MatchRead(BaseModel):
@@ -28,6 +30,10 @@ class MatchRead(BaseModel):
     slots: list[MatchSlotRead]
     voice_channel_url: str | None = None
     substitutions: list["MatchSubstitutionRead"] = Field(default_factory=list)
+    map_candidates: list[str] = Field(default_factory=list)
+    discord_setup: int | None = None
+    teams_locked_at: datetime | None = None
+    team_average_elo: dict[str, float] = Field(default_factory=dict)
 
 
 class MatchCreateRequest(BaseModel):
@@ -60,9 +66,14 @@ class LeaderboardEntry(BaseModel):
     average_deaths: float
     kill_death_ratio: float
     damage_per_minute: float
+    elo_rating: int | None = None
 
 
 class RecentMatchListResponse(BaseModel):
+    matches: list[MatchRead] = Field(default_factory=list)
+
+
+class ActiveMatchListResponse(BaseModel):
     matches: list[MatchRead] = Field(default_factory=list)
 
 

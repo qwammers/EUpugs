@@ -20,12 +20,13 @@ export function PlayerPage({ player }: PlayerPageProps) {
   return (
     <div className="page-grid">
       <section className="panel">
-        <div className="panel-header">
+      <div className="panel-header">
           <h1>{player.display_name ?? player.discord_username}</h1>
           <span className={`pill ${player.steam_connected ? "pill-good" : "pill-warn"}`}>
             {player.steam_connected ? "Steam linked" : "Imported profile"}
           </span>
-        </div>
+      </div>
+      <p><strong>{player.elo_rating ?? "Unseeded"}</strong> Elo</p>
         <p>Discord: {player.discord_user_id.startsWith("logstf:") ? "Not linked" : player.discord_username}</p>
         <p>Steam: {player.steam_name ?? "Not connected"}</p>
         <p>Last sync: {player.last_synced_at ?? "Historical import"}</p>

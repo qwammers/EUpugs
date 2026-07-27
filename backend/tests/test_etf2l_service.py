@@ -41,11 +41,12 @@ def result(division: str, tier: int = 5, competition_type: str = "6v6") -> dict:
     }
 
 
-def test_etf2l_low_player_is_automatically_accepted() -> None:
+def test_etf2l_low_player_is_recommended_for_runner_review() -> None:
     service, player = make_service([result("Low")])
     asyncio.run(service.refresh(player, force=True))
     assert player.etf2l_skill_band == "lower"
-    assert player.etf2l_decision == "accepted"
+    assert player.etf2l_decision == "manual_review"
+    assert player.etf2l_evidence["recommended_tier"] == "sapphire"
 
 
 def test_etf2l_highest_history_requires_review() -> None:
@@ -58,5 +59,5 @@ def test_etf2l_highest_history_requires_review() -> None:
 def test_etf2l_ignores_non_sixes_results() -> None:
     service, player = make_service([result("Premiership", 1, "Highlander")])
     asyncio.run(service.refresh(player, force=True))
-    assert player.etf2l_skill_band == "fresh"
-    assert player.etf2l_decision == "accepted"
+    assert player.etf2l_skill_band == "pubber"
+    assert player.etf2l_decision == "manual_review"

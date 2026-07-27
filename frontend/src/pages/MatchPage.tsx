@@ -34,12 +34,15 @@ export function MatchPage({ match }: MatchPageProps) {
               .map((slot) => (
                 <div className="team-row" key={`${team}-${slot.player_id}`}>
                   <span>{slot.display_name ?? slot.discord_username}</span>
-                  <span>{slot.assigned_class}</span>
+                  <span>{slot.assigned_class} · {slot.elo_at_lock} Elo {slot.elo_delta != null ? `(${slot.elo_delta >= 0 ? "+" : ""}${slot.elo_delta})` : ""}</span>
                 </div>
               ))}
           </div>
         ))}
       </div>
+      {Object.keys(match.team_average_elo).length > 0 && <p className="muted">
+        Team Elo: RED {Math.round(match.team_average_elo.RED ?? 0)} · BLU {Math.round(match.team_average_elo.BLU ?? 0)}
+      </p>}
       <div className="match-meta">
         <strong>Logs</strong>
         {match.log_ids.length > 0 ? match.log_ids.map((logId) => (

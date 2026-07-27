@@ -18,9 +18,11 @@ type SortKey = keyof Pick<
   | "average_deaths"
   | "kill_death_ratio"
   | "damage_per_minute"
+  | "elo_rating"
 >;
 
 const columns: Array<{ key: SortKey; label: string; title: string }> = [
+  { key: "elo_rating", label: "Elo", title: "Current hosted PUG Elo" },
   { key: "matches_played", label: "MP", title: "Matches played" },
   { key: "wins", label: "W", title: "Wins" },
   { key: "losses", label: "L", title: "Losses" },
@@ -55,7 +57,7 @@ export function LeaderboardPage({ entries }: LeaderboardPageProps) {
       return entry.matches_played >= minimumGames
         && name.toLowerCase().includes(search.trim().toLowerCase());
     }).sort((left, right) => {
-      const difference = left[sortKey] - right[sortKey];
+      const difference = (left[sortKey] ?? 0) - (right[sortKey] ?? 0);
       return descending ? -difference : difference;
     }),
     [descending, minimumGames, search, sortKey, sourceEntries],
@@ -99,7 +101,7 @@ export function LeaderboardPage({ entries }: LeaderboardPageProps) {
           <tbody>{visibleEntries.map((entry) => (
             <tr key={entry.player_id}>
               <td><Link to={`/players/${entry.player_id}`}>{entry.display_name ?? entry.discord_username}</Link></td>
-              <td>{entry.matches_played}</td><td>{entry.wins}</td><td>{entry.losses}</td>
+              <td>{entry.elo_rating ?? "-"}</td><td>{entry.matches_played}</td><td>{entry.wins}</td><td>{entry.losses}</td>
               <td className={entry.win_percentage >= 50 ? "win-rate-good" : "win-rate-bad"}>{format(entry.win_percentage)}%</td>
               <td>{format(entry.average_kills)}</td><td>{format(entry.average_assists)}</td>
               <td>{format(entry.average_deaths)}</td><td>{format(entry.kill_death_ratio)}</td>

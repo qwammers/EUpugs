@@ -10,7 +10,6 @@ from app.db.session import get_db
 from app.models.entities import Player
 from app.schemas.match import (
     AttachLogRequest,
-    MatchCreateRequest,
     MatchRead,
     MatchStateUpdateRequest,
     MatchSubstitutionRequest,
@@ -21,7 +20,7 @@ from app.schemas.player import (
     PlayerRead,
     PlayerUsernameUpdate,
 )
-from app.schemas.queue import MapCandidatesRequest, QueueStateResponse
+from app.schemas.queue import QueueStateResponse
 from app.services.etf2l import Etf2lService
 from app.services.match import MatchService
 from app.services.queue import QueueService
@@ -71,19 +70,6 @@ def update_player_username(
     )
 
 
-@router.post("/matches/create", response_model=MatchRead)
-def create_match(
-    payload: MatchCreateRequest,
-    player: Player = Depends(require_admin),
-    db: Session = Depends(get_db),
-) -> MatchRead:
-    try:
-        match = MatchService(db).create_match_from_active_queue(player, payload.map_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return MatchService.serialize(match)
-
-
 @router.post("/matches/{match_id}/state", response_model=MatchRead)
 def update_match_state(
     match_id: int,
@@ -98,7 +84,7 @@ def update_match_state(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return MatchService.serialize(match)
+    return MatchService(db).serialize(match, player)
 
 
 @router.post("/matches/{match_id}/attach-log", response_model=MatchRead)
@@ -125,20 +111,18 @@ async def attach_log(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     refreshed = match_service.get_match(match_id)
-    return MatchService.serialize(refreshed)
+    return match_service.serialize(refreshed, player)
 
 
-@router.post("/queue/maps", response_model=QueueStateResponse)
-def set_map_candidates(
-    payload: MapCandidatesRequest,
+@router.delete("/queue/players/{player_id}", response_model=QueueStateResponse)
+def remove_queued_player(
+    player_id: int,
     admin: Player = Depends(require_admin),
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings_dep),
 ) -> QueueStateResponse:
-    service = QueueService(db)
-    try:
-        service.set_map_candidates(payload.maps)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    service = QueueService(db, settings)
+    service.remove_player(player_id)
     return service.build_queue_state(admin)
 
 
@@ -156,7 +140,7 @@ def substitute_player(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return service.serialize(match)
+    return service.serialize(match, admin)
 
 
 def _etf2l_summary(player: Player) -> dict:
@@ -215,7 +199,9 @@ def decide_etf2l(
     if not player:
         raise HTTPException(status_code=404, detail="Player not found.")
     try:
-        result = Etf2lService(db, settings).decide(player, admin, payload.decision)
+        result = Etf2lService(db, settings).decide(
+            player, admin, payload.decision, payload.skill_tier
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _etf2l_summary(result)

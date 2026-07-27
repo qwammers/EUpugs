@@ -4,7 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.models.base import Base
-from app.models.entities import Player
+from app.core.constants import PUG_MAP_POOL
+from app.models.entities import Match, Player
 from app.services.queue import QueueService
 
 
@@ -23,6 +24,7 @@ def seed_player(db: Session, idx: int, steam: bool = True) -> Player:
         steam_connected=steam,
         steam_id=str(76561198000000000 + idx) if steam else None,
         guild_role_ids=[],
+        elo_rating=1000,
     )
     db.add(player)
     db.commit()
@@ -30,18 +32,16 @@ def seed_player(db: Session, idx: int, steam: bool = True) -> Player:
     return player
 
 
-def test_join_queue_rejects_duplicate_entries() -> None:
+def test_join_queue_switches_primary_without_duplicate_entry() -> None:
     db = make_session()
     service = QueueService(db)
     player = seed_player(db, 1)
 
     service.join_queue(player, ["scout"], "active")
-    try:
-        service.join_queue(player, ["soldier"], "active")
-    except ValueError as exc:
-        assert "already queued" in str(exc)
-    else:
-        raise AssertionError("Duplicate queue join should fail.")
+    service.join_queue(player, ["soldier"], "active")
+    entries = service.get_entries("active")
+    assert len(entries) == 1
+    assert entries[0].preferences[0].class_name == "soldier"
 
 
 def test_matchable_assignment_accepts_valid_12_player_pool() -> None:
@@ -118,3 +118,42 @@ def test_matchable_queue_starts_ready_check_and_pre_ready_auto_readies() -> None
     assert state.ready_check_expires_at
     queued_first = next(row for row in state.active.players if row.player_id == first.id)
     assert queued_first.ready is True
+
+
+def test_forming_match_owns_three_random_map_candidates() -> None:
+    db = make_session()
+    match = QueueService(db).ensure_forming_match()
+    assert match.status == "forming"
+    assert len(match.map_candidates) == 3
+    assert len(set(match.map_candidates)) == 3
+    assert set(match.map_candidates).issubset(PUG_MAP_POOL)
+
+
+def test_all_ready_locks_balanced_teams_and_rotates_queue() -> None:
+    db = make_session()
+    service = QueueService(db)
+    classes = ["scout"] * 4 + ["soldier"] * 4 + ["demo"] * 2 + ["medic"] * 2
+    players = []
+    for idx, primary in enumerate(classes, start=1):
+        player = seed_player(db, idx)
+        player.elo_rating = 800 + idx * 50
+        db.commit()
+        players.append(player)
+        service.upsert_primary(player, primary)
+    original_match_id = service.build_queue_state().match_id
+    for player in players:
+        service.set_ready(player, True)
+
+    locked = db.get(Match, original_match_id)
+    assert locked.status == "ready"
+    assert len(locked.slots) == 12
+    for team in ("RED", "BLU"):
+        team_slots = [slot for slot in locked.slots if slot.team == team]
+        assert len(team_slots) == 6
+        counts = {}
+        for slot in team_slots:
+            counts[slot.assigned_class] = counts.get(slot.assigned_class, 0) + 1
+        assert counts == {"scout": 2, "soldier": 2, "demo": 1, "medic": 1}
+    next_state = service.build_queue_state()
+    assert next_state.match_id != original_match_id
+    assert next_state.queue.count == 0

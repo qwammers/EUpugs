@@ -41,6 +41,8 @@ class PlayerRead(BaseModel):
     etf2l_skill_band: str | None = None
     etf2l_decision: str | None = None
     etf2l_checked_at: datetime | None = None
+    elo_rating: int | None = None
+    elo_seed_source: str | None = None
 
 
 class PlayerClassStatsRead(BaseModel):
@@ -67,3 +69,4 @@ class PlayerUsernameUpdate(BaseModel):
 
 class Etf2lDecisionRequest(BaseModel):
     decision: str
+    skill_tier: str | None = None

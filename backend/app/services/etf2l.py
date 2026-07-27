@@ -47,7 +47,9 @@ class Etf2lService:
             profile_payload = await self.client.get_player(player.steam_id)
             profile = profile_payload.get("player", profile_payload if profile_payload else {})
             if not profile:
-                self._apply(player, None, None, "fresh", "accepted", {"profile": None})
+                self._apply(player, None, None, "pubber", "manual_review", {
+                    "profile": None, "recommended_tier": None
+                })
                 return player
 
             results: list[dict] = []
@@ -77,8 +79,9 @@ class Etf2lService:
                 })
                 return player
             if not sixes:
-                self._apply(player, None, None, "fresh", "accepted", {
-                    "profile": profile, "results": [], "complete": complete
+                self._apply(player, None, None, "pubber", "manual_review", {
+                    "profile": profile, "results": [], "complete": complete,
+                    "recommended_tier": None,
                 })
                 return player
             if not complete:
@@ -91,16 +94,19 @@ class Etf2lService:
             ranked = sorted(divisions, key=self._division_rank, reverse=True)
             highest_name = str(ranked[0].get("name", "")).strip()
             band = self._classify(highest_name)
-            decision = "accepted" if band == "lower" else "manual_review"
-            self._apply(player, recent_name, highest_name, band, decision, {
-                "profile": profile, "results": sixes, "complete": True
+            recommendation = self._recommend_tier(recent_name, highest_name)
+            self._apply(player, recent_name, highest_name, band, "manual_review", {
+                "profile": profile, "results": sixes, "complete": True,
+                "recommended_tier": recommendation,
             })
             return player
         except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
             self._apply(player, None, None, "unknown", "manual_review", {"error": str(exc)})
             return player
 
-    def decide(self, player: Player, admin: Player, decision: str) -> Player:
+    def decide(
+        self, player: Player, admin: Player, decision: str, skill_tier: str | None = None
+    ) -> Player:
         if decision not in {"accepted", "rejected", "automatic"}:
             raise ValueError("Decision must be accepted, rejected, or automatic.")
         if decision == "automatic":
@@ -113,6 +119,22 @@ class Etf2lService:
             player.etf2l_decision = decision
             player.etf2l_reviewed_by_player_id = admin.id
             player.etf2l_reviewed_at = datetime.now(timezone.utc)
+            if decision == "accepted" and skill_tier:
+                tiers = {
+                    "obsidian": ("1363181710463860826", 1600),
+                    "sapphire": ("1363181641014575425", 1400),
+                    "silver": ("1363181525939519709", 1200),
+                    "bronze": ("1367534417303703703", 1000),
+                    "steel": ("1363541855668666459", 900),
+                    "iron": ("1375873812679364798", 800),
+                }
+                if skill_tier.lower() not in tiers:
+                    raise ValueError("Unknown skill tier.")
+                role_id, rating = tiers[skill_tier.lower()]
+                player.elo_rating = rating
+                player.elo_seed_source = "etf2l_review"
+                player.elo_source_role_id = role_id
+                player.elo_seeded_at = datetime.now(timezone.utc)
         self.db.commit()
         return player
 
@@ -157,3 +179,22 @@ class Etf2lService:
         if classification == "lower":
             return 100
         return 400
+
+    @staticmethod
+    def _recommend_tier(recent: str, highest: str) -> str | None:
+        tiers = {"bronze": 1, "silver": 2, "sapphire": 3, "obsidian": 4}
+
+        def recommendation(name: str) -> str | None:
+            value = name.lower()
+            if "division 4" in value or "div 4" in value or "top low" in value:
+                return "obsidian"
+            if "low" in value or "top open" in value:
+                return "sapphire"
+            if "open" in value:
+                return "silver"
+            if "fresh" in value:
+                return "bronze"
+            return None
+
+        values = [value for value in (recommendation(recent), recommendation(highest)) if value]
+        return max(values, key=lambda value: tiers[value]) if values else None

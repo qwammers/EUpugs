@@ -11,7 +11,7 @@ from app.core.config import Settings
 from app.db.session import get_db
 from app.models.entities import Player
 from app.schemas.common import HealthResponse
-from app.schemas.match import LeaderboardEntry, MatchRead, RecentMatchListResponse
+from app.schemas.match import ActiveMatchListResponse, LeaderboardEntry, MatchRead, RecentMatchListResponse
 from app.schemas.player import PlayerAggregateRead, PlayerClassStatsRead, PlayerRead
 from app.schemas.queue import QueueStateResponse
 from app.services.match import MatchService
@@ -30,14 +30,27 @@ def health() -> HealthResponse:
 def get_queue_state(
     db: Session = Depends(get_db),
     player: Player | None = Depends(get_optional_player),
+    settings: Settings = Depends(get_settings_dep),
 ) -> QueueStateResponse:
-    return QueueService(db).build_queue_state(player)
+    return QueueService(db, settings).build_queue_state(player)
 
 
 @router.get("/api/matches/current", response_model=MatchRead | None)
 def get_current_match(db: Session = Depends(get_db)) -> MatchRead | None:
-    match = MatchService(db).get_current_match()
-    return MatchService.serialize(match) if match else None
+    service = MatchService(db)
+    match = service.get_current_match()
+    return service.serialize(match) if match else None
+
+
+@router.get("/api/matches/active", response_model=ActiveMatchListResponse)
+def get_active_matches(
+    db: Session = Depends(get_db),
+    player: Player | None = Depends(get_optional_player),
+) -> ActiveMatchListResponse:
+    service = MatchService(db)
+    return ActiveMatchListResponse(
+        matches=[service.serialize(match, player) for match in service.get_active_matches()]
+    )
 
 
 @router.get("/api/matches/recent", response_model=RecentMatchListResponse)
@@ -48,12 +61,16 @@ def get_recent_matches(db: Session = Depends(get_db)) -> RecentMatchListResponse
 
 
 @router.get("/api/matches/{match_id}", response_model=MatchRead)
-def get_match(match_id: int, db: Session = Depends(get_db)) -> MatchRead:
+def get_match(
+    match_id: int,
+    db: Session = Depends(get_db),
+    player: Player | None = Depends(get_optional_player),
+) -> MatchRead:
     service = MatchService(db)
     match = service.get_match(match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match not found.")
-    return service.serialize(match)
+    return service.serialize(match, player)
 
 
 @router.get("/api/players/{player_id}", response_model=PlayerRead)
@@ -88,6 +105,8 @@ def get_player(
         steam_connected=player.steam_connected,
         guild_role_ids=player.guild_role_ids,
         last_synced_at=player.last_synced_at,
+        elo_rating=player.elo_rating,
+        elo_seed_source=player.elo_seed_source,
         aggregate=aggregate,
         class_stats=class_stats,
     )
@@ -126,6 +145,7 @@ def get_leaderboard(
                 average_deaths=float(row["deaths"]) / matches if matches else 0,
                 kill_death_ratio=float(row["kill_death_ratio"]),
                 damage_per_minute=float(row["damage_per_minute"]),
+                elo_rating=player.elo_rating,
             ))
         return output
     rows = stats_service.get_leaderboard()
@@ -152,6 +172,7 @@ def get_leaderboard(
                 if aggregate.combat_time_seconds
                 else 0
             ),
+            elo_rating=player.elo_rating,
         )
         for player, aggregate in rows
     ]

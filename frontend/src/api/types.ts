@@ -1,4 +1,4 @@
-export type QueueBucketName = "active" | "next";
+export type QueueBucketName = "active";
 
 export interface QueuePlayer {
   player_id: number;
@@ -11,6 +11,7 @@ export interface QueuePlayer {
   primary_class: string;
   flex_classes: string[];
   pre_ready_expires_at: string | null;
+  elo_rating: number | null;
 }
 
 export interface QueueBucket {
@@ -20,8 +21,9 @@ export interface QueueBucket {
 }
 
 export interface QueueState {
+  match_id: number;
+  queue: QueueBucket;
   active: QueueBucket;
-  next: QueueBucket;
   matchable: boolean;
   needed_by_class: Record<string, number>;
   phase: "waiting" | "ready_check";
@@ -39,6 +41,8 @@ export interface MatchSlot {
   assigned_class: string;
   team: string;
   slot_order: number;
+  elo_at_lock: number;
+  elo_delta: number | null;
 }
 
 export interface MatchRead {
@@ -55,6 +59,10 @@ export interface MatchRead {
   slots: MatchSlot[];
   voice_channel_url: string | null;
   substitutions: MatchSubstitution[];
+  map_candidates: string[];
+  discord_setup: number | null;
+  teams_locked_at: string | null;
+  team_average_elo: Record<string, number>;
 }
 
 export interface MatchSubstitution {
@@ -96,6 +104,8 @@ export interface PlayerRead {
   last_synced_at: string | null;
   aggregate: Aggregate | null;
   class_stats: PlayerClassStats[];
+  elo_rating: number | null;
+  elo_seed_source: string | null;
 }
 
 export interface PlayerClassStats {
@@ -130,9 +140,14 @@ export interface LeaderboardEntry {
   average_deaths: number;
   kill_death_ratio: number;
   damage_per_minute: number;
+  elo_rating: number | null;
 }
 
 export interface RecentMatchListResponse {
+  matches: MatchRead[];
+}
+
+export interface ActiveMatchListResponse {
   matches: MatchRead[];
 }
 

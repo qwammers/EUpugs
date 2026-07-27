@@ -99,6 +99,8 @@ def get_me(
             steam_connected=player.steam_connected,
             guild_role_ids=player.guild_role_ids,
             last_synced_at=player.last_synced_at,
+            elo_rating=player.elo_rating,
+            elo_seed_source=player.elo_seed_source,
             aggregate=aggregate,
         ),
         is_admin=bool(set(player.guild_role_ids).intersection(settings.admin_role_ids)),

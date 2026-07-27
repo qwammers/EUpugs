@@ -17,6 +17,7 @@ function RoutedApp() {
   const meState = useAsyncData<MeResponse | null>(() => api.getMe().catch(() => null), []);
   const queueState = useAsyncData<QueueState>(() => api.getQueue(), []);
   const currentMatchState = useAsyncData<MatchRead | null>(() => api.getCurrentMatch(), []);
+  const activeMatchesState = useAsyncData(() => api.getActiveMatches(), []);
   const leaderboardState = useAsyncData(() => api.getLeaderboard(), []);
   const recentMatchesState = useAsyncData(() => api.getRecentMatches(), []);
 
@@ -26,14 +27,16 @@ function RoutedApp() {
   };
 
   const refreshAll = async () => {
-    const [queue, match, leaderboard, recent] = await Promise.all([
+    const [queue, match, activeMatches, leaderboard, recent] = await Promise.all([
       api.getQueue(),
       api.getCurrentMatch(),
+      api.getActiveMatches(),
       api.getLeaderboard(),
       api.getRecentMatches(),
     ]);
     queueState.setData(queue);
     currentMatchState.setData(match);
+    activeMatchesState.setData(activeMatches);
     leaderboardState.setData(leaderboard);
     recentMatchesState.setData(recent);
   };
@@ -74,7 +77,7 @@ function RoutedApp() {
             <AdminPage
               me={meState.data}
               queue={queueState.data}
-              currentMatch={currentMatchState.data}
+              activeMatches={activeMatchesState.data?.matches ?? []}
               refreshAll={refreshAll}
             />
           }

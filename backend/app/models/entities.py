@@ -45,6 +45,10 @@ class Player(Base, TimestampMixin):
     etf2l_reviewed_by_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     etf2l_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     etf2l_evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    elo_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    elo_seed_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    elo_source_role_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    elo_seeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="player", cascade="all, delete-orphan")
     queue_entries: Mapped[list["QueueEntry"]] = relationship(
@@ -72,6 +76,7 @@ class QueueEntry(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
     queue_bucket: Mapped[str] = mapped_column(String(16), default=QueueBucket.ACTIVE.value)
     ready: Mapped[bool] = mapped_column(Boolean, default=False)
     pre_ready_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -103,6 +108,8 @@ class QueueCycle(Base):
     ready_check_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     map_candidates: Mapped[list[str]] = mapped_column(JSON, default=list)
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    selected_player_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -113,6 +120,7 @@ class QueueMapVote(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     queue_cycle_id: Mapped[int] = mapped_column(ForeignKey("queue_cycles.id"))
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
     map_name: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -122,8 +130,11 @@ class Match(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[str] = mapped_column(String(32), default=MatchStatus.FORMING.value)
-    created_by_player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    created_by_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    map_candidates: Mapped[list[str]] = mapped_column(JSON, default=list)
+    discord_setup: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    teams_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     winner: Mapped[str | None] = mapped_column(String(8), nullable=True)
     score_red: Mapped[int | None] = mapped_column(Integer, nullable=True)
     score_blu: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -146,6 +157,7 @@ class MatchSlot(Base):
     team: Mapped[str] = mapped_column(String(3))
     assigned_class: Mapped[str] = mapped_column(String(16))
     slot_order: Mapped[int] = mapped_column(Integer)
+    elo_at_lock: Mapped[int] = mapped_column(Integer, default=0)
 
     match: Mapped[Match] = relationship(back_populates="slots")
     player: Mapped[Player] = relationship()
@@ -181,6 +193,23 @@ class MatchLog(Base):
     attached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     match: Mapped[Match] = relationship(back_populates="logs")
+
+
+class EloRatingEvent(Base):
+    __tablename__ = "elo_rating_events"
+    __table_args__ = (UniqueConstraint("match_id", "player_id", name="uq_elo_event_match_player"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"))
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    team: Mapped[str] = mapped_column(String(3))
+    result: Mapped[str] = mapped_column(String(8))
+    old_rating: Mapped[int] = mapped_column(Integer)
+    delta: Mapped[int] = mapped_column(Integer)
+    new_rating: Mapped[int] = mapped_column(Integer)
+    team_average: Mapped[int] = mapped_column(Integer)
+    opponent_average: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class ImportedLog(Base):

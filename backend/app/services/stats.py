@@ -17,6 +17,7 @@ from app.models.entities import (
     PlayerAggregate,
     PlayerMatchStat,
 )
+from app.services.elo import EloService
 
 
 class StatsService:
@@ -46,8 +47,18 @@ class StatsService:
         self.db.add(match_log)
         self.db.flush()
         self._ingest_log_payload(payload, match.id, log_id=log_id)
+        teams = payload.get("teams", {})
+        match.score_red = int(teams.get("Red", {}).get("score", 0))
+        match.score_blu = int(teams.get("Blue", {}).get("score", 0))
+        match.winner = (
+            "RED" if match.score_red > match.score_blu
+            else "BLU" if match.score_blu > match.score_red
+            else "DRAW"
+        )
         self.db.commit()
         self.db.refresh(match_log)
+        self.db.refresh(match)
+        EloService(self.db).settle_match(match)
         return match_log
 
     async def sync_recent_history_for_player(self, player: Player) -> int:

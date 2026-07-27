@@ -12,7 +12,7 @@ export function HomePage({ queue, currentMatch }: HomePageProps) {
     <div className="page-grid">
       <section className="panel spotlight">
         <p className="eyebrow">Single-guild TF2 6s</p>
-        <h1>Run your pug flow from one queue to the next.</h1>
+        <h1>Queue for the next match in one click.</h1>
         <p>
           HostedPugs keeps Discord-authenticated players, class preferences, ready checks, match state,
           and logs.tf stats in one place.
@@ -24,8 +24,8 @@ export function HomePage({ queue, currentMatch }: HomePageProps) {
               <span>Active queue</span>
             </div>
             <div>
-              <strong>{queue.next.count}</strong>
-              <span>Next queue</span>
+              <strong>#{queue.match_id}</strong>
+              <span>Forming match</span>
             </div>
             <div>
               <strong>{queue.matchable ? "Ready" : "Waiting"}</strong>
@@ -36,8 +36,6 @@ export function HomePage({ queue, currentMatch }: HomePageProps) {
       </section>
       <MatchCard match={currentMatch} />
       {queue && <QueueCard bucket={queue.active} />}
-      {queue && <QueueCard bucket={queue.next} />}
     </div>
   );
 }
-

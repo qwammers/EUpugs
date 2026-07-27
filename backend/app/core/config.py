@@ -21,8 +21,14 @@ class Settings(BaseSettings):
     discord_guild_id: str = Field(alias="DISCORD_GUILD_ID")
     discord_log_channel_id: str = Field(alias="DISCORD_LOG_CHANNEL_ID")
     discord_admin_role_ids: str = Field(default="", alias="DISCORD_ADMIN_ROLE_IDS")
-    discord_match_role_id: str = Field(default="", alias="DISCORD_MATCH_ROLE_ID")
-    discord_voice_channel_id: str = Field(default="", alias="DISCORD_VOICE_CHANNEL_ID")
+    discord_match1_red_role_id: str = Field(default="", alias="DISCORD_MATCH1_RED_ROLE_ID")
+    discord_match1_red_voice_channel_id: str = Field(default="", alias="DISCORD_MATCH1_RED_VOICE_CHANNEL_ID")
+    discord_match1_blu_role_id: str = Field(default="", alias="DISCORD_MATCH1_BLU_ROLE_ID")
+    discord_match1_blu_voice_channel_id: str = Field(default="", alias="DISCORD_MATCH1_BLU_VOICE_CHANNEL_ID")
+    discord_match2_red_role_id: str = Field(default="", alias="DISCORD_MATCH2_RED_ROLE_ID")
+    discord_match2_red_voice_channel_id: str = Field(default="", alias="DISCORD_MATCH2_RED_VOICE_CHANNEL_ID")
+    discord_match2_blu_role_id: str = Field(default="", alias="DISCORD_MATCH2_BLU_ROLE_ID")
+    discord_match2_blu_voice_channel_id: str = Field(default="", alias="DISCORD_MATCH2_BLU_VOICE_CHANNEL_ID")
     discord_approved_role_id: str = Field(default="", alias="DISCORD_APPROVED_ROLE_ID")
     discord_class_restrictions: str = Field(default="{}", alias="DISCORD_CLASS_RESTRICTIONS")
     etf2l_api_base_url: str = Field(default="https://api-v2.etf2l.org", alias="ETF2L_API_BASE_URL")
@@ -45,6 +51,12 @@ class Settings(BaseSettings):
     @property
     def login_redirect_url(self) -> str:
         return (self.frontend_url or self.frontend_origin).rstrip("/")
+
+    def match_role_id(self, setup: int, team: str) -> str:
+        return str(getattr(self, f"discord_match{setup}_{team.lower()}_role_id", ""))
+
+    def match_voice_channel_id(self, setup: int, team: str) -> str:
+        return str(getattr(self, f"discord_match{setup}_{team.lower()}_voice_channel_id", ""))
 
 
 @lru_cache(maxsize=1)
