@@ -50,7 +50,7 @@ export function AdminPage({
         <h2>Match #{match.id}</h2>
         <span className="pill">{match.status} · setup {match.discord_setup ?? "waiting"}</span>
       </div>
-      <p>{match.map_name ?? "Map pending"} · RED {Math.round(match.team_average_elo.RED ?? 0)} Elo · BLU {Math.round(match.team_average_elo.BLU ?? 0)} Elo</p>
+      <p>{match.map_name ?? "Map pending"} · RED {Math.round(match.team_average_rating.RED ?? 0)} Rating · BLU {Math.round(match.team_average_rating.BLU ?? 0)} Rating</p>
       <div className="button-row">
         <button disabled={busy || match.status !== "ready" || !match.discord_setup}
           onClick={() => void run(() => api.updateMatchState(match.id, "live"), "Match started.")}>Start live</button>
@@ -106,7 +106,7 @@ export function AdminPage({
           <button disabled={busy || !tiers[review.player_id]} onClick={() => void run(
             () => api.decideEtf2l(review.player_id, "accepted", tiers[review.player_id]).then(() =>
               setReviews((current) => current.filter((item) => item.player_id !== review.player_id))
-            ), "Tier approved and Elo seeded.",
+            ), "Tier approved and PUG Rating seeded.",
           )}>Approve tier</button>
           <button disabled={busy} onClick={() => void run(
             () => api.decideEtf2l(review.player_id, "rejected"), "Player rejected.",

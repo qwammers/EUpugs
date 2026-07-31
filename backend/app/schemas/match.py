@@ -12,6 +12,17 @@ class MatchSlotRead(BaseModel):
     assigned_class: str
     team: str
     slot_order: int
+    rating_at_lock: int = 0
+    rating_delta: int | None = None
+    rating_result_component: int | None = None
+    rating_impact_modifier: int | None = None
+    rating_dominant_class: str | None = None
+    rating_damage_per_minute: float | None = None
+    rating_kills_per_minute: float | None = None
+    rating_dpm_percentile: float | None = None
+    rating_kpm_percentile: float | None = None
+    rating_benchmark_samples: int | None = None
+    rating_formula_version: str | None = None
     elo_at_lock: int = 0
     elo_delta: int | None = None
 
@@ -33,6 +44,7 @@ class MatchRead(BaseModel):
     map_candidates: list[str] = Field(default_factory=list)
     discord_setup: int | None = None
     teams_locked_at: datetime | None = None
+    team_average_rating: dict[str, float] = Field(default_factory=dict)
     team_average_elo: dict[str, float] = Field(default_factory=dict)
 
 
@@ -66,6 +78,7 @@ class LeaderboardEntry(BaseModel):
     average_deaths: float
     kill_death_ratio: float
     damage_per_minute: float
+    pug_rating: int | None = None
     elo_rating: int | None = None
 
 

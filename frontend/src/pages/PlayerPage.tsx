@@ -26,7 +26,7 @@ export function PlayerPage({ player }: PlayerPageProps) {
             {player.steam_connected ? "Steam linked" : "Imported profile"}
           </span>
       </div>
-      <p><strong>{player.elo_rating ?? "Unseeded"}</strong> Elo</p>
+      <p><strong>{player.pug_rating ?? "Unseeded"}</strong> PUG Rating</p>
         <p>Discord: {player.discord_user_id.startsWith("logstf:") ? "Not linked" : player.discord_username}</p>
         <p>Steam: {player.steam_name ?? "Not connected"}</p>
         <p>Last sync: {player.last_synced_at ?? "Historical import"}</p>

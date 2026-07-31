@@ -105,7 +105,8 @@ def get_player(
         steam_connected=player.steam_connected,
         guild_role_ids=player.guild_role_ids,
         last_synced_at=player.last_synced_at,
-        elo_rating=player.elo_rating,
+        pug_rating=player.pug_rating,
+        elo_rating=player.pug_rating,
         elo_seed_source=player.elo_seed_source,
         aggregate=aggregate,
         class_stats=class_stats,
@@ -145,7 +146,8 @@ def get_leaderboard(
                 average_deaths=float(row["deaths"]) / matches if matches else 0,
                 kill_death_ratio=float(row["kill_death_ratio"]),
                 damage_per_minute=float(row["damage_per_minute"]),
-                elo_rating=player.elo_rating,
+                pug_rating=player.pug_rating,
+                elo_rating=player.pug_rating,
             ))
         return output
     rows = stats_service.get_leaderboard()
@@ -172,7 +174,8 @@ def get_leaderboard(
                 if aggregate.combat_time_seconds
                 else 0
             ),
-            elo_rating=player.elo_rating,
+            pug_rating=player.pug_rating,
+            elo_rating=player.pug_rating,
         )
         for player, aggregate in rows
     ]

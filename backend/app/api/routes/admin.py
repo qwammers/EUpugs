@@ -66,6 +66,9 @@ def update_player_username(
         steam_connected=player.steam_connected,
         guild_role_ids=player.guild_role_ids,
         last_synced_at=player.last_synced_at,
+        pug_rating=player.pug_rating,
+        elo_rating=player.pug_rating,
+        elo_seed_source=player.elo_seed_source,
         aggregate=aggregate,
     )
 

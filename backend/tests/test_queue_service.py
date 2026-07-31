@@ -110,7 +110,8 @@ def test_all_ready_locks_balanced_teams_and_rotates_queue() -> None:
     players = []
     for idx, primary in enumerate(classes, start=1):
         player = seed_player(db, idx)
-        player.elo_rating = 800 + idx * 50
+        player.pug_rating = 800 + idx * 50
+        player.elo_rating = player.pug_rating
         db.commit()
         players.append(player)
         service.upsert_primary(player, primary)

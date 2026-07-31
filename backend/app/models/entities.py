@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import JobStatus, MatchStatus, QueueBucket
@@ -49,6 +49,7 @@ class Player(Base, TimestampMixin):
     elo_seed_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     elo_source_role_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     elo_seeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pug_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="player", cascade="all, delete-orphan")
     queue_entries: Mapped[list["QueueEntry"]] = relationship(
@@ -158,6 +159,7 @@ class MatchSlot(Base):
     assigned_class: Mapped[str] = mapped_column(String(16))
     slot_order: Mapped[int] = mapped_column(Integer)
     elo_at_lock: Mapped[int] = mapped_column(Integer, default=0)
+    rating_at_lock: Mapped[int] = mapped_column(Integer, default=0)
 
     match: Mapped[Match] = relationship(back_populates="slots")
     player: Mapped[Player] = relationship()
@@ -209,6 +211,32 @@ class EloRatingEvent(Base):
     new_rating: Mapped[int] = mapped_column(Integer)
     team_average: Mapped[int] = mapped_column(Integer)
     opponent_average: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PugRatingEvent(Base):
+    __tablename__ = "pug_rating_events"
+    __table_args__ = (UniqueConstraint("match_id", "player_id", name="uq_pug_rating_match_player"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"))
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    team: Mapped[str] = mapped_column(String(3))
+    result: Mapped[str] = mapped_column(String(8))
+    old_rating: Mapped[int] = mapped_column(Integer)
+    result_component: Mapped[int] = mapped_column(Integer)
+    impact_modifier: Mapped[int] = mapped_column(Integer, default=0)
+    delta: Mapped[int] = mapped_column(Integer)
+    new_rating: Mapped[int] = mapped_column(Integer)
+    dominant_class: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    damage_per_minute: Mapped[float | None] = mapped_column(Float, nullable=True)
+    kills_per_minute: Mapped[float | None] = mapped_column(Float, nullable=True)
+    dpm_percentile: Mapped[float | None] = mapped_column(Float, nullable=True)
+    kpm_percentile: Mapped[float | None] = mapped_column(Float, nullable=True)
+    benchmark_sample_count: Mapped[int] = mapped_column(Integer, default=0)
+    team_average: Mapped[int] = mapped_column(Integer)
+    opponent_average: Mapped[int] = mapped_column(Integer)
+    formula_version: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

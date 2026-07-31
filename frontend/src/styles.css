@@ -301,6 +301,24 @@ input:focus {
   border: 1px solid var(--panel-border);
 }
 
+.rating-breakdown {
+  grid-column: 1 / -1;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--panel-border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.rating-breakdown summary {
+  color: var(--secondary);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.rating-breakdown p {
+  margin: 0.5rem 0 0;
+}
+
 .class-picker,
 .button-row {
   display: flex;

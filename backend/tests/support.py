@@ -22,6 +22,7 @@ def seed_player(db: Session, idx: int, steam: bool = True) -> Player:
         steam_connected=steam,
         steam_id=str(76561198000000000 + idx) if steam else None,
         guild_role_ids=[],
+        pug_rating=1000,
         elo_rating=1000,
     )
     db.add(player)

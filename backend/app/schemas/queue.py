@@ -54,6 +54,7 @@ class QueuePlayerRead(BaseModel):
     discord_username: str
     display_name: str | None
     steam_name: str | None
+    pug_rating: int | None
     elo_rating: int | None
     ready: bool
     joined_at: datetime

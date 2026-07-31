@@ -61,3 +61,15 @@ def test_etf2l_ignores_non_sixes_results() -> None:
     asyncio.run(service.refresh(player, force=True))
     assert player.etf2l_skill_band == "pubber"
     assert player.etf2l_decision == "manual_review"
+
+
+def test_runner_tier_does_not_reset_established_rating() -> None:
+    service, player = make_service([])
+    admin = seed_player(service.db, 2)
+    player.pug_rating = 1127
+    service.db.commit()
+
+    service.decide(player, admin, "accepted", "obsidian")
+
+    assert player.pug_rating == 1127
+    assert player.elo_rating == 1000

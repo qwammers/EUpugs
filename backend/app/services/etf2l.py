@@ -131,10 +131,12 @@ class Etf2lService:
                 if skill_tier.lower() not in tiers:
                     raise ValueError("Unknown skill tier.")
                 role_id, rating = tiers[skill_tier.lower()]
-                player.elo_rating = rating
-                player.elo_seed_source = "etf2l_review"
-                player.elo_source_role_id = role_id
-                player.elo_seeded_at = datetime.now(timezone.utc)
+                if player.pug_rating is None:
+                    player.pug_rating = rating
+                    player.elo_rating = rating
+                    player.elo_seed_source = "etf2l_review"
+                    player.elo_source_role_id = role_id
+                    player.elo_seeded_at = datetime.now(timezone.utc)
         self.db.commit()
         return player
 

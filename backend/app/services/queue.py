@@ -34,7 +34,11 @@ class QueueService:
         self.settings = settings
 
     def seed_elo_from_roles(self, player: Player) -> None:
+        if player.pug_rating is not None:
+            return
         if player.elo_rating is not None:
+            player.pug_rating = player.elo_rating
+            self.db.commit()
             return
         candidates = [
             (rating, role_id)
@@ -43,6 +47,7 @@ class QueueService:
         ]
         if candidates:
             rating, role_id = max(candidates)
+            player.pug_rating = rating
             player.elo_rating = rating
             player.elo_seed_source = "discord_role"
             player.elo_source_role_id = role_id
@@ -86,7 +91,7 @@ class QueueService:
         if not player.steam_connected:
             raise ValueError("A Steam connection is required before joining the queue.")
         self.seed_elo_from_roles(player)
-        if player.elo_rating is None:
+        if player.pug_rating is None:
             raise ValueError("A runner must approve your skill tier before you can queue.")
         flex_classes = [item for item in dict.fromkeys(flex_classes or []) if item != primary_class]
         selected = [primary_class, *flex_classes]
@@ -345,7 +350,8 @@ class QueueService:
                 team=teams[assignment.player_id],
                 assigned_class=assignment.assigned_class,
                 slot_order=order,
-                elo_at_lock=player.elo_rating or 0,
+                rating_at_lock=player.pug_rating or 0,
+                elo_at_lock=player.pug_rating or 0,
             ))
         match.map_name = self._winning_map(match)
         match.status = MatchStatus.READY.value
@@ -387,7 +393,7 @@ class QueueService:
     def _balanced_teams(
         self, assignments: list[QueueAssignment], entries: list[QueueEntry]
     ) -> dict[int, str]:
-        ratings = {entry.player_id: entry.player.elo_rating or 0 for entry in entries}
+        ratings = {entry.player_id: entry.player.pug_rating or 0 for entry in entries}
         by_class: dict[str, list[int]] = {name: [] for name in QUEUE_CLASS_ORDER}
         for assignment in assignments:
             by_class[assignment.assigned_class].append(assignment.player_id)
@@ -474,7 +480,8 @@ class QueueService:
                 discord_username=entry.player.discord_username,
                 display_name=entry.player.display_name,
                 steam_name=entry.player.steam_name,
-                elo_rating=entry.player.elo_rating,
+                pug_rating=entry.player.pug_rating,
+                elo_rating=entry.player.pug_rating,
                 ready=entry.ready,
                 joined_at=entry.joined_at,
                 primary_class=primary,

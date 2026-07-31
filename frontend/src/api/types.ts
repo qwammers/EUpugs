@@ -11,6 +11,7 @@ export interface QueuePlayer {
   primary_class: string;
   flex_classes: string[];
   pre_ready_expires_at: string | null;
+  pug_rating: number | null;
   elo_rating: number | null;
 }
 
@@ -41,6 +42,17 @@ export interface MatchSlot {
   assigned_class: string;
   team: string;
   slot_order: number;
+  rating_at_lock: number;
+  rating_delta: number | null;
+  rating_result_component: number | null;
+  rating_impact_modifier: number | null;
+  rating_dominant_class: string | null;
+  rating_damage_per_minute: number | null;
+  rating_kills_per_minute: number | null;
+  rating_dpm_percentile: number | null;
+  rating_kpm_percentile: number | null;
+  rating_benchmark_samples: number | null;
+  rating_formula_version: string | null;
   elo_at_lock: number;
   elo_delta: number | null;
 }
@@ -62,6 +74,7 @@ export interface MatchRead {
   map_candidates: string[];
   discord_setup: number | null;
   teams_locked_at: string | null;
+  team_average_rating: Record<string, number>;
   team_average_elo: Record<string, number>;
 }
 
@@ -104,6 +117,7 @@ export interface PlayerRead {
   last_synced_at: string | null;
   aggregate: Aggregate | null;
   class_stats: PlayerClassStats[];
+  pug_rating: number | null;
   elo_rating: number | null;
   elo_seed_source: string | null;
 }
@@ -140,6 +154,7 @@ export interface LeaderboardEntry {
   average_deaths: number;
   kill_death_ratio: number;
   damage_per_minute: number;
+  pug_rating: number | null;
   elo_rating: number | null;
 }
 

@@ -278,7 +278,7 @@ async def profile_command(interaction: discord.Interaction) -> None:
             f"Steam: {player.steam_name or 'not linked'}\n"
             f"Matches: {aggregate.matches_played if aggregate else 0}\n"
             f"Wins: {aggregate.wins if aggregate else 0}"
-            f"\nElo: {player.elo_rating if player.elo_rating is not None else 'unseeded'}"
+            f"\nPUG Rating: {player.pug_rating if player.pug_rating is not None else 'unseeded'}"
         )
     await interaction.response.send_message(message, ephemeral=True)
 

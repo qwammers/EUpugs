@@ -19,12 +19,22 @@ HostedPugs is a Team Fortress 2 6v6 PUG platform consisting of:
 - Discord OAuth login, guild membership validation, and Steam identity discovery
 - Primary-class and flex-class TF2 6s queueing
 - Three-minute pre-ready status and immediate 45-second ready checks
-- Three-map voting and runner-controlled match creation
+- Match-owned queues with randomized three-map voting
 - Discord role-based class restrictions
 - Temporary Discord match-role and voice-channel access
-- Next-match queueing and audited live substitutions
+- PUG Rating-balanced team locking and audited live substitutions
 - ETF2L v2 skill screening and runner review
 - `logs.tf` ingestion, player profiles, class statistics, leaderboard, and match archive
+- Outcome-first PUG Rating with class-normalized combat impact
+
+## PUG Rating
+
+Existing Elo values become each player's starting PUG Rating. Hosted match wins always add rating,
+losses always remove rating, and draws are neutral. The normal result is 16 points, adjusted to
+12-20 for team strength. Scout, Soldier, and Demoman receive a further capped `-4` to `+4`
+modifier based on class-relative DPM and kills per minute; Medic receives a fixed 16-point result.
+Imported logs supply benchmarks but never change ratings directly. Every applied change stores
+its formula version and calculation evidence for auditability.
 
 ## Local Development
 
@@ -170,8 +180,9 @@ curl https://YOUR_HOSTNAME/health
 ```
 
 With `ENABLE_AUTO_MIGRATE=true`, API startup applies pending Alembic migrations to RDS.
-Revision `20260727_0005` converts the queue to match ownership, merges the old next queue,
-seeds Elo from recognized Discord skill roles, and preserves existing matches, logs, and stats.
+Revision `20260729_0006` preserves existing Elo values as the starting PUG Rating and introduces
+versioned outcome-first rating evidence. Existing matches, logs, statistics, and rating history
+remain intact.
 
 ### 5. Deploy GitHub Pages
 

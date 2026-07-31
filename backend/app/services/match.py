@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import Settings, get_settings
 from app.core.constants import MatchStatus
-from app.models.entities import EloRatingEvent, Match, MatchSlot, MatchSubstitution, Player, QueueEntry
+from app.models.entities import Match, MatchSlot, MatchSubstitution, Player, PugRatingEvent, QueueEntry
 from app.schemas.match import MatchRead, MatchSlotRead, MatchSubstitutionRead
-from app.services.elo import EloService
+from app.services.elo import PugRatingService
 from app.services.queue import QueueService
 
 
@@ -57,7 +57,8 @@ class MatchService:
             assigned_class=slot.assigned_class,
         ))
         slot.player_id = incoming_player_id
-        slot.elo_at_lock = incoming.elo_rating or 0
+        slot.rating_at_lock = incoming.pug_rating or 0
+        slot.elo_at_lock = incoming.pug_rating or 0
         self.db.delete(queued)
         self.db.commit()
         return self.get_match(match_id)
@@ -123,14 +124,16 @@ class MatchService:
         elif status == MatchStatus.CANCELLED.value:
             match.discord_setup = None
         self.db.commit()
-        EloService(self.db).settle_match(match)
+        PugRatingService(self.db).settle_match(match)
         QueueService(self.db, self.settings).allocate_waiting_setups()
         return self.get_match(match_id)
 
     def serialize(self, match: Match, viewer: Player | None = None) -> MatchRead:
         events = {
-            event.player_id: event.delta
-            for event in self.db.scalars(select(EloRatingEvent).where(EloRatingEvent.match_id == match.id))
+            event.player_id: event
+            for event in self.db.scalars(
+                select(PugRatingEvent).where(PugRatingEvent.match_id == match.id)
+            )
         }
         voice_url = None
         if viewer and match.discord_setup:
@@ -145,7 +148,9 @@ class MatchService:
         for team in ("RED", "BLU"):
             team_slots = [slot for slot in match.slots if slot.team == team]
             if team_slots:
-                averages[team] = sum(slot.elo_at_lock for slot in team_slots) / len(team_slots)
+                averages[team] = sum(
+                    slot.rating_at_lock or slot.elo_at_lock for slot in team_slots
+                ) / len(team_slots)
         return MatchRead(
             id=match.id,
             status=match.status,
@@ -159,6 +164,7 @@ class MatchService:
             completed_at=match.completed_at,
             teams_locked_at=match.teams_locked_at,
             discord_setup=match.discord_setup,
+            team_average_rating=averages,
             team_average_elo=averages,
             log_ids=[log.log_id for log in match.logs],
             voice_channel_url=voice_url,
@@ -170,8 +176,59 @@ class MatchService:
                     assigned_class=slot.assigned_class,
                     team=slot.team,
                     slot_order=slot.slot_order,
-                    elo_at_lock=slot.elo_at_lock,
-                    elo_delta=events.get(slot.player_id),
+                    rating_at_lock=slot.rating_at_lock or slot.elo_at_lock,
+                    rating_delta=(
+                        events[slot.player_id].delta if slot.player_id in events else None
+                    ),
+                    rating_result_component=(
+                        events[slot.player_id].result_component
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_impact_modifier=(
+                        events[slot.player_id].impact_modifier
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_dominant_class=(
+                        events[slot.player_id].dominant_class
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_damage_per_minute=(
+                        events[slot.player_id].damage_per_minute
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_kills_per_minute=(
+                        events[slot.player_id].kills_per_minute
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_dpm_percentile=(
+                        events[slot.player_id].dpm_percentile
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_kpm_percentile=(
+                        events[slot.player_id].kpm_percentile
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_benchmark_samples=(
+                        events[slot.player_id].benchmark_sample_count
+                        if slot.player_id in events
+                        else None
+                    ),
+                    rating_formula_version=(
+                        events[slot.player_id].formula_version
+                        if slot.player_id in events
+                        else None
+                    ),
+                    elo_at_lock=slot.rating_at_lock or slot.elo_at_lock,
+                    elo_delta=(
+                        events[slot.player_id].delta if slot.player_id in events else None
+                    ),
                 )
                 for slot in sorted(match.slots, key=lambda item: item.slot_order)
             ],

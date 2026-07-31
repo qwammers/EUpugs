@@ -21,7 +21,7 @@ export function QueueCard({ bucket, isAdmin = false, onRemove }: QueueCardProps)
             <article className="queue-row" key={`${bucket.queue_bucket}-${player.player_id}`}>
               <div>
                 <strong>{player.display_name ?? player.discord_username}</strong>
-                <p>{player.steam_name ?? "No Steam name"} · {player.elo_rating ?? "Unseeded"} Elo</p>
+                <p>{player.steam_name ?? "No Steam name"} · {player.pug_rating ?? "Unseeded"} PUG Rating</p>
               </div>
               <div>
                 <span className={`pill ${player.ready ? "pill-good" : "pill-warn"}`}>
