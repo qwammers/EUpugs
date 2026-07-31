@@ -42,6 +42,21 @@ class FakeLogsClient:
                             "dmg": 100,
                             "total_time": 600,
                         },
+                        {
+                            "type": "sniper",
+                            "kills": 0,
+                            "deaths": 0,
+                            "assists": 0,
+                            "dmg": 0,
+                            "total_time": 0,
+                        },
+                        {
+                            "kills": 0,
+                            "deaths": 0,
+                            "assists": 0,
+                            "dmg": 0,
+                            "total_time": 0,
+                        },
                     ],
                 }
             },
@@ -83,6 +98,7 @@ async def test_historical_import_creates_provisional_player_and_is_idempotent() 
         assert db.scalar(select(ImportedLog).where(ImportedLog.log_id == 123)) is not None
 
         class_stats = {row["class_name"]: row for row in service.get_player_class_stats(player.id)}
+        assert set(class_stats) == {"scout", "medic"}
         assert class_stats["scout"]["wins"] == 1
         assert class_stats["medic"]["wins"] == 0
         assert class_stats["scout"]["damage_per_minute"] == 300
@@ -143,3 +159,18 @@ def test_most_common_observed_name_changes_only_until_admin_lock() -> None:
     StatsService._record_name(player, "Later")
     StatsService._record_name(player, "Later")
     assert player.display_name == "Common"
+
+
+def test_repeated_class_segments_are_aggregated() -> None:
+    breakdown = StatsService._class_breakdown(
+        [
+            {"type": "soldier", "kills": 3, "dmg": 1000, "total_time": 200},
+            {"type": "soldier", "kills": 2, "dmg": 800, "total_time": 100},
+            {"type": "medic", "assists": 4, "total_time": 50},
+            "malformed",
+        ]
+    )
+    assert breakdown["soldier"]["kills"] == 5
+    assert breakdown["soldier"]["damage"] == 1800
+    assert breakdown["soldier"]["total_time"] == 300
+    assert breakdown["medic"]["assists"] == 4

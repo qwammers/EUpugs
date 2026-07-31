@@ -17,7 +17,9 @@ from app.models.entities import (
     PlayerAggregate,
     PlayerMatchStat,
 )
-from app.services.elo import EloService
+from app.services.elo import PugRatingService
+
+PROFILE_CLASSES = frozenset({"scout", "soldier", "demoman", "medic"})
 
 
 class StatsService:
@@ -58,7 +60,7 @@ class StatsService:
         self.db.commit()
         self.db.refresh(match_log)
         self.db.refresh(match)
-        EloService(self.db).settle_match(match)
+        PugRatingService(self.db).settle_match(match)
         return match_log
 
     async def sync_recent_history_for_player(self, player: Player) -> int:
@@ -136,6 +138,8 @@ class StatsService:
                 key=lambda name: (breakdown[name].get("total_time", 0), name),
             )
             for class_name, class_row in breakdown.items():
+                if class_name not in PROFILE_CLASSES:
+                    continue
                 total = totals.setdefault(
                     class_name,
                     {
@@ -253,16 +257,7 @@ class StatsService:
 
             team = stats.get("team")
             result = "draw" if winning_team is None else ("win" if team == winning_team else "loss")
-            class_breakdown = {
-                item.get("type", "unknown"): {
-                    "kills": item.get("kills", 0),
-                    "deaths": item.get("deaths", 0),
-                    "assists": item.get("assists", 0),
-                    "damage": item.get("dmg", 0),
-                    "total_time": item.get("total_time", 0),
-                }
-                for item in stats.get("class_stats", [])
-            }
+            class_breakdown = self._class_breakdown(stats.get("class_stats", []))
             combat_damage, combat_time_seconds = self._combat_totals(class_breakdown)
             row = PlayerMatchStat(
                 player_id=player.id,
@@ -321,6 +316,33 @@ class StatsService:
             sum(row.get("damage", 0) for row in combat_classes),
             sum(row.get("total_time", 0) for row in combat_classes),
         )
+
+    @staticmethod
+    def _class_breakdown(class_stats: object) -> dict[str, dict[str, int]]:
+        breakdown: dict[str, dict[str, int]] = {}
+        if not isinstance(class_stats, list):
+            return breakdown
+        fields = {
+            "kills": "kills",
+            "deaths": "deaths",
+            "assists": "assists",
+            "damage": "dmg",
+            "total_time": "total_time",
+        }
+        for item in class_stats:
+            if not isinstance(item, dict):
+                continue
+            class_name = str(item.get("type") or "unknown").lower()
+            row = breakdown.setdefault(
+                class_name,
+                {"kills": 0, "deaths": 0, "assists": 0, "damage": 0, "total_time": 0},
+            )
+            for target, source in fields.items():
+                try:
+                    row[target] += max(0, int(item.get(source, 0) or 0))
+                except (TypeError, ValueError):
+                    continue
+        return breakdown
 
     def _update_aggregate(self, player_id: int, stat: PlayerMatchStat) -> None:
         aggregate = next(
